@@ -182,22 +182,22 @@ try {
     await call('ai.configure', { provider: 'ollama', model: 'qwen2.5:1.5b', baseUrl: OLLAMA });
     await nav('Ask');
     await page.getByLabel('Question').fill('What have we decided about the garage controller?');
-    // A small model doesn't always cite inline or pick the current decision (the demo switched to the ESP32-S3);
+    // A small model doesn't always pick the current decision (the demo switched to the ESP32-S3) or cite inline;
     // ask up to four times, and leave the shot out rather than publish a wrong answer.
-    let cited = false;
-    for (let attempt = 1; attempt <= 4 && !cited; attempt++) {
+    let correct = false;
+    for (let attempt = 1; attempt <= 4 && !correct; attempt++) {
       await page.locator('form.ask-form').getByRole('button', { name: 'Ask' }).click();
       const thinking = page.locator('form.ask-form').getByRole('button', { name: /Thinking/ });
       await thinking.waitFor();
       await thinking.waitFor({ state: 'detached', timeout: 180_000 });
       await page.locator('.answer .answer-text').waitFor();
       const answer = (await page.locator('.answer .answer-text').textContent()) ?? '';
-      cited = (await page.locator('.answer .answer-text .cite').count()) > 0 && /ESP32-S3/i.test(answer);
+      correct = /ESP32-S3/i.test(answer) && (await page.locator('.answer .answer-text .cite, .answer .sources li').count()) > 0;
     }
-    if (cited) await shot('ask');
+    if (correct) await shot('ask');
     else {
       rmSync(join(OUT, 'ask.png'), { force: true });
-      skipped.push('ask.png: in four tries qwen2.5:1.5b never gave a cited answer naming the current ESP32-S3 decision');
+      skipped.push('ask.png: in four tries qwen2.5:1.5b never named the current ESP32-S3 decision');
     }
     await call('ai.configure', { provider: 'none', model: '', baseUrl: '' });
   } else {

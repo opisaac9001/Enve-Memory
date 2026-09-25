@@ -48,6 +48,8 @@
 | **Activity.** Which AI did what: Claude Code, Codex, the extension, your phone. | **Graph.** Items, projects and tags, connected. |
 | ![AI tools](docs/screenshots/desktop/settings-ai-tools.png) | ![Devices](docs/screenshots/desktop/settings-devices.png) |
 | **Connect AI tools.** One-click setup for Claude Code, Codex and JSON-configured clients. | **Devices.** Scoped tokens and QR pairing for your phone. |
+| ![Ask](docs/screenshots/desktop/ask.png) | ![Light theme](docs/screenshots/desktop/home-light.png) |
+| **Ask your library.** Answers only from what you saved, with sources; replaced decisions give way to current ones. | **Light theme**, or follow the system. |
 
 ### Browser extension
 
