@@ -114,7 +114,7 @@ export const routes: Route[] = [
 
   {
     method: 'GET', pattern: path('/search'), scope: 'read',
-    handle: ({ memory, query }) => memory.search.query(query.get('q') ?? '', queryFilter(query), queryLimit(query)),
+    handle: ({ memory, query }) => memory.search.hybrid(query.get('q') ?? '', queryFilter(query), queryLimit(query)),
   },
 
   {

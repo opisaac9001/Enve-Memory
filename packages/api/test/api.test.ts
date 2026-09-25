@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
 import { after, test } from 'node:test';
 import { createApiServer, pairingLink } from '@enve-memory/api';
-import { EnveMemory } from '@enve-memory/core';
+import { type Embedder, EnveMemory } from '@enve-memory/core';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 
 const memory = EnveMemory.open({ inMemory: true, actor: 'test' });
@@ -259,4 +259,22 @@ test('capture clients can change intent on re-save, keep import dates, and hand 
   assert.equal((await call('POST', `/api/v1/items/${first.data.item.id}/reminded`, extension)).status, 200);
   assert.equal((await call('GET', '/api/v1/reminders?due=true', reader)).data.some((i: { id: string }) => i.id === first.data.item.id), false);
   assert.equal((await call('POST', '/api/v1/capture', extension, { url: 'https://example.com/x2', createdAt: 'yesterday-ish' })).status, 400);
+});
+
+test('search over HTTP uses hybrid search when an embedder is attached', async () => {
+  const concept: Embedder = {
+    model: 'test:api-concepts',
+    async embed(texts) {
+      return texts.map((t) => (/garage|opener|motor/i.test(t) ? new Float32Array([1, 0]) : new Float32Array([0, 1])));
+    },
+  };
+  const note = memory.items.saveNote({ body: 'The LiftMaster opener needs a dry contact' });
+  memory.search.embedder = concept;
+  await memory.embeddings.indexPending(concept, 500);
+  try {
+    const hits = (await call('GET', `/api/v1/search?q=${encodeURIComponent('garage motor')}`, reader)).data;
+    assert.ok(hits.some((h: { id: string; match: string }) => h.id === note.id && h.match !== 'keyword'));
+  } finally {
+    memory.search.embedder = null;
+  }
 });

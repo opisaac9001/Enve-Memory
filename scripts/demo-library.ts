@@ -124,8 +124,7 @@ memory.files.save({ createdAt: days(8), data: new TextEncoder().encode('GPIO4  â
 const bench = as('mcp:claude-code', () => memory.tasks.create({ createdAt: days(6), title: 'Build the Security+ 2.0 bench simulator', project: 'garage', priority: 'high', due: new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10) }));
 as('mcp:codex', () => memory.tasks.create({ createdAt: days(5), title: 'Order a 4-channel level shifter', project: 'garage', due: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) }));
 as('desktop', () => memory.tasks.create({ createdAt: days(3), title: 'Print the enclosure test fit', project: 'garage', priority: 'low' }));
-const restore = as('desktop', () => memory.tasks.create({ createdAt: days(13), title: 'Run a restore test from the NAS', project: 'home lab' }));
-memory.tasks.complete(restore.id);
+as('desktop', () => memory.tasks.create({ createdAt: days(13), title: 'Run a restore test from the NAS', project: 'home lab' }));
 as('mcp:claude-code', () => memory.tasks.create({ createdAt: days(9), title: 'Move Plex to hardware transcoding', project: 'home lab', priority: 'high' }));
 
 // Relations, shelves, reminders and AI suggestions
