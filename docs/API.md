@@ -35,7 +35,7 @@ Errors are `{"error": {"code", "message"}}` with the status: `401 unauthorized`,
 | `POST /capture/batch` | capture | `{items: [capture bodies]}` (≤ 2000) → `{created, skipped, failed, results}`; each entry succeeds or fails alone |
 | `POST /items/:id/opened` | capture | Records that the user opened it (drives the "unopened" shelf) |
 | `POST /items` | capture | `{type: note \| bookmark \| task, title, body, url, project, tags, due, priority}` |
-| `POST /files` | capture | Raw body. Headers: `Content-Type`, `X-Filename`, and optionally `X-Title`, `X-Note`, `X-Project`, `X-Tags` (comma list), all percent-encoded UTF-8. Up to 200 MB. |
+| `POST /files` | capture | Raw body. Headers: `Content-Type`, `X-Filename`, and optionally `X-Title`, `X-Note`, `X-Project`, `X-Tags` (comma list), `X-Remind`, `X-Intent`, `X-Pinned: true`, all percent-encoded UTF-8. Up to 200 MB. |
 | `PATCH /items/:id` | write | `{title?, body?, url?, project? (null = unfile)}` |
 | `POST /items/:id/archive` and `/unarchive` | write | |
 | `POST /items/:id/pin` | write | `{pinned}` |

@@ -83,3 +83,15 @@ test('a file whose bytes have not arrived yet is a 404, not a crash', async () =
   assert.equal(alive.status, 200);
   assert.equal((await fetch(`${base}/api/v1/items/%E0%A4%A/file`, { headers: { Authorization: `Bearer ${reader}` } })).status, 400);
 });
+
+test('file uploads can carry a reminder, intent and pin', async () => {
+  const response = await upload(phone, new TextEncoder().encode('manual'), {
+    'X-Filename': 'manual.txt', 'X-Remind': encodeURIComponent('2026-12-01T09:00:00Z'), 'X-Intent': 'revisit', 'X-Pinned': 'true',
+  });
+  const { item } = (await response.json()) as { item: { remindAt: string; intent: string; pinnedAt: string | null } };
+  assert.equal(item.remindAt, '2026-12-01T09:00:00.000Z');
+  assert.equal(item.intent, 'revisit');
+  assert.ok(item.pinnedAt);
+  assert.equal((await upload(phone, new TextEncoder().encode('never saved'), { 'X-Filename': 'x.txt', 'X-Intent': 'someday' })).status, 400);
+  assert.equal(memory.search.query('never saved').length, 0, 'a bad header saves nothing');
+});

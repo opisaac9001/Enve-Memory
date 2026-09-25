@@ -2,7 +2,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import { pipeline } from 'node:stream';
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { type ApiClient, type ClientScope, DrainWorker, type EnveMemory, MemoryError } from '@enve-memory/core';
+import { type ApiClient, type ClientScope, DrainWorker, type EnveMemory, INTENTS, MemoryError, parseWhen } from '@enve-memory/core';
 import { processPending } from '@enve-memory/ingestion';
 import { createServer as createMcpServer } from '@enve-memory/mcp';
 import { toNodeHandler } from '@modelcontextprotocol/node';
@@ -62,7 +62,7 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
       if (req.method === 'OPTIONS') {
         res.writeHead(204, {
           'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key, Mcp-Session-Id, Mcp-Protocol-Version, X-Filename, X-Title, X-Note, X-Project, X-Tags',
+          'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key, Mcp-Session-Id, Mcp-Protocol-Version, X-Filename, X-Title, X-Note, X-Project, X-Tags, X-Remind, X-Intent, X-Pinned',
           'Access-Control-Max-Age': '600',
         });
         return res.end();
@@ -101,7 +101,13 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
         requireScope(client, 'capture');
         if (replay) return replayResponse(res, replay);
         const data = await readBody(req, MAX_FILE_BODY);
-        const result = memory.withActor(`api:${client.name}`, () => memory.files.save({
+        const remind = header(req, 'x-remind');
+        const intent = header(req, 'x-intent');
+        // Checked before anything is saved, so a bad header never leaves a half-applied upload behind.
+        if (remind) parseWhen(remind);
+        if (intent && !(INTENTS as readonly string[]).includes(intent)) throw new HttpError(400, 'invalid', `X-Intent must be one of ${INTENTS.join(', ')}.`);
+        const result = memory.withActor(`api:${client.name}`, () => {
+          const saved = memory.files.save({
           data,
           filename: header(req, 'x-filename') ?? '',
           mimeType: req.headers['content-type'],
@@ -109,7 +115,12 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
           note: header(req, 'x-note'),
           project: header(req, 'x-project'),
           tags: header(req, 'x-tags')?.split(',').map((t) => t.trim()).filter(Boolean),
-        }));
+          });
+          if (remind) memory.items.setReminder(saved.item.id, remind);
+          if (intent) memory.items.setIntent(saved.item.id, intent);
+          if (header(req, 'x-pinned') === 'true') memory.items.pin(saved.item.id, true);
+          return remind || intent || header(req, 'x-pinned') === 'true' ? { item: memory.items.get(saved.item.id), created: saved.created } : saved;
+        });
         changed();
         return respond(201, result);
       }
