@@ -7,7 +7,7 @@ import Observation
 final class OutboxService {
     enum Outcome {
         case sent(Data)
-        case queued
+        case queued(OutboxEntry)
         case failed(Error)
     }
 
@@ -42,9 +42,9 @@ final class OutboxService {
             }
         }
         do {
-            try await outbox.enqueue(endpoint, kind: kind, title: title, attachment: file)
+            let entry = try await outbox.enqueue(endpoint, kind: kind, title: title, attachment: file)
             await reload()
-            return .queued
+            return .queued(entry)
         } catch {
             return .failed(error)
         }

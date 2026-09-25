@@ -83,6 +83,15 @@ public enum ReminderPlan {
 
     public static func identifier(for itemID: String) -> String { identifierPrefix + itemID }
 
+    /// A capture still in the outbox has no item id yet, so its reminder is scheduled under the entry's id
+    /// and replaced by the real one on the first sync after the entry is sent.
+    public static let pendingPrefix = identifierPrefix + "pending."
+
+    public static func pendingRequest(entryID: UUID, title: String, fireDate: Date) -> ReminderRequest {
+        ReminderRequest(identifier: pendingPrefix + entryID.uuidString, itemID: entryID.uuidString, title: title, body: "Enve Memory",
+                        fireDate: fireDate, url: URL(string: "\(PairingLink.scheme)://home")!)
+    }
+
     public static func request(for item: Item, at fireDate: Date) -> ReminderRequest {
         let body = [item.type.rawValue.capitalized, item.project?.name, item.url.flatMap { URL(string: $0)?.host() }]
             .compactMap(\.self).joined(separator: " · ")
@@ -102,9 +111,12 @@ public enum ReminderPlan {
     }
 
     /// Adding with an existing identifier replaces that notification, so a moved reminder is only an add.
-    public static func diff(items: [Item], scheduled: [ScheduledReminder], now: Date) -> (add: [ReminderRequest], remove: [String]) {
+    /// `waiting` is the outbox's entry ids: their provisional reminders stay until the entry has been sent.
+    public static func diff(items: [Item], scheduled: [ScheduledReminder], now: Date, waiting: Set<UUID> = [])
+        -> (add: [ReminderRequest], remove: [String]) {
         let wanted = requests(for: items, now: now)
-        let ours = scheduled.filter { $0.identifier.hasPrefix(identifierPrefix) }
+        let waitingIDs = Set(waiting.map { pendingPrefix + $0.uuidString })
+        let ours = scheduled.filter { $0.identifier.hasPrefix(identifierPrefix) && !waitingIDs.contains($0.identifier) }
         let current = Dictionary(ours.map { ($0.identifier, $0) }, uniquingKeysWith: { first, _ in first })
         let add = wanted.filter { request in
             guard let existing = current[request.identifier], let fireDate = existing.fireDate else { return true }

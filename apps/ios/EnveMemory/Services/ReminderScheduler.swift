@@ -30,7 +30,7 @@ final class ReminderScheduler {
 
     /// Shows a just-set reminder right away; the next sync reconciles it with the server.
     func schedule(_ item: Item, at date: Date) async {
-        try? await Self.add(ReminderPlan.request(for: item, at: date))
+        try? await LocalReminders.add(ReminderPlan.request(for: item, at: date))
     }
 
     func cancel(itemID: String) {
@@ -45,23 +45,12 @@ final class ReminderScheduler {
                               fireDate: (request.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate(),
                               title: request.content.title)
         }
-        let plan = ReminderPlan.diff(items: items, scheduled: scheduled, now: .now)
+        let waiting = Set(await Outbox().entries().map(\.id))
+        let plan = ReminderPlan.diff(items: items, scheduled: scheduled, now: .now, waiting: waiting)
         center.removePendingNotificationRequests(withIdentifiers: plan.remove)
         for request in plan.add {
-            try await add(request)
+            try await LocalReminders.add(request)
         }
-    }
-
-    nonisolated private static func add(_ reminder: ReminderRequest) async throws {
-        let content = UNMutableNotificationContent()
-        content.title = reminder.title
-        content.body = reminder.body
-        content.sound = .default
-        content.threadIdentifier = "reminders"
-        content.userInfo = ["url": reminder.url.absoluteString]
-        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: reminder.fireDate)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: reminder.identifier, content: content, trigger: trigger))
     }
 }
 

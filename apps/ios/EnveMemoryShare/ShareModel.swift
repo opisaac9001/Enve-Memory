@@ -37,10 +37,12 @@ final class ShareModel {
         didSet { form.remind = remindPreset?.date() }
     }
 
-    var takesReminder: Bool {
+    var takesReminder: Bool { content != nil }
+
+    var takesIntent: Bool {
         switch content {
-        case .link, .text: true
-        case .files, nil: false
+        case .link, .files: true
+        case .text, nil: false
         }
     }
 
@@ -76,8 +78,11 @@ final class ShareModel {
             for capture in captures {
                 if let client, queued == 0 {
                     do {
-                        _ = try await client.data(for: capture.endpoint, uploadingFile: capture.file)
+                        let response = try await client.data(for: capture.endpoint, uploadingFile: capture.file)
                         if let file = capture.file { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+                        if let remind = form.remind {
+                            await LocalReminders.schedule(after: response, queued: nil, title: capture.title, at: remind)
+                        }
                         continue
                     } catch let error as APIError where !error.isRetryable {
                         throw error
@@ -85,7 +90,10 @@ final class ShareModel {
                         // Unreachable: this and the rest wait in the outbox.
                     }
                 }
-                try await Outbox().enqueue(capture.endpoint, kind: capture.kind, title: capture.title, attachment: capture.file)
+                let entry = try await Outbox().enqueue(capture.endpoint, kind: capture.kind, title: capture.title, attachment: capture.file)
+                if let remind = form.remind {
+                    await LocalReminders.schedule(after: nil, queued: entry, title: capture.title, at: remind)
+                }
                 queued += 1
             }
             if pairing == nil {

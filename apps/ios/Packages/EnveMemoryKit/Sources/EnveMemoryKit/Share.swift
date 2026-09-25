@@ -19,9 +19,8 @@ public struct ShareForm: Hashable, Sendable {
     public var note: String
     public var projectID: String?
     public var tags: String
-    /// Links only.
+    /// Links and files; a text note has no intent.
     public var intent: Intent?
-    /// Links and text; `/files` has no reminder field.
     public var remind: Date?
 
     public init(title: String = "", note: String = "", projectID: String? = nil, tags: String = "", intent: Intent? = nil, remind: Date? = nil) {
@@ -68,7 +67,7 @@ public enum SharePayload {
         case .files(let files):
             return files.map { file in
                 let upload = FileUpload(filename: file.filename, mimeType: file.mimeType, title: files.count == 1 ? title : nil,
-                                        note: note, project: form.projectID, tags: tags)
+                                        note: note, project: form.projectID, tags: tags, intent: form.intent, remind: form.remind)
                 return PendingCapture(endpoint: .upload(upload), kind: .file, title: upload.title ?? file.filename, file: file.url)
             }
         }

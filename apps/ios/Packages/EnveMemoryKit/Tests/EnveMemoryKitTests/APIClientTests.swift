@@ -86,6 +86,16 @@ import Testing
         #expect(request.value(forHTTPHeaderField: "X-Note") == nil)
     }
 
+    @Test func fileUploadCarriesIntentReminderAndPin() throws {
+        let at = try #require(JSONCoding.parseTimestamp("2026-09-26T16:00:00Z"))
+        let endpoint = Endpoint.upload(FileUpload(filename: "p.jpg", mimeType: "image/jpeg", intent: .revisit, remind: at, pinned: true))
+        #expect(endpoint.headers["X-Intent"] == "revisit")
+        #expect(endpoint.headers["X-Remind"] == "2026-09-26T16%3A00%3A00.000Z")
+        #expect(endpoint.headers["X-Pinned"] == "true")
+        let plain = Endpoint.upload(FileUpload(filename: "p.jpg", mimeType: "image/jpeg"))
+        #expect(plain.headers["X-Intent"] == nil && plain.headers["X-Remind"] == nil && plain.headers["X-Pinned"] == nil)
+    }
+
     @Test func downloadNamesCannotEscapeTheFolder() {
         #expect(APIClient.safeFilename("../../etc/passwd") == ".._.._etc_passwd")
         #expect(APIClient.safeFilename("..") == "file")

@@ -145,6 +145,7 @@ struct CaptureSheet: View {
     }
 
     private func save() {
+        let remindAt = kind == .task ? nil : remind?.date()
         let tagList = Tags.parse(tags)
         let title = trimmedTitle.isEmpty ? nil : trimmedTitle
         let body = trimmedText.isEmpty ? nil : trimmedText
@@ -153,12 +154,12 @@ struct CaptureSheet: View {
         switch kind {
         case .note:
             endpoint = try? .capture(CaptureRequest(title: title, note: body ?? "", project: projectID, tags: tagList.isEmpty ? nil : tagList,
-                                                    remind: remind?.date()))
+                                                    remind: remindAt))
             label = title ?? String((body ?? "").prefix(60))
         case .link:
             let link = linkURL?.absoluteString ?? url
             endpoint = try? .capture(CaptureRequest(url: link, title: title, note: body, project: projectID, tags: tagList.isEmpty ? nil : tagList,
-                                                    intent: intent, remind: remind?.date()))
+                                                    intent: intent, remind: remindAt))
             label = title ?? link
         case .task:
             endpoint = try? .createItem(NewItemRequest(type: .task, title: title, body: body, project: projectID, tags: tagList,
@@ -168,10 +169,16 @@ struct CaptureSheet: View {
         guard let endpoint else { return }
         SharedSettings().lastProjectID = projectID
         saving = true
-        let wantsReminder = remind != nil && kind != .task
         Task {
-            if wantsReminder { await reminders.requestAuthorizationIfNeeded() }
+            if remindAt != nil { await reminders.requestAuthorizationIfNeeded() }
             let outcome = await outbox.submit(endpoint, kind: OutboxEntry.Kind(kind), title: label)
+            if let remindAt {
+                switch outcome {
+                case .sent(let data): await LocalReminders.schedule(after: data, queued: nil, title: label, at: remindAt)
+                case .queued(let entry): await LocalReminders.schedule(after: nil, queued: entry, title: label, at: remindAt)
+                case .failed: break
+                }
+            }
             saving = false
             if router.report(outcome, sent: "\(kind.title) saved") { dismiss() }
         }

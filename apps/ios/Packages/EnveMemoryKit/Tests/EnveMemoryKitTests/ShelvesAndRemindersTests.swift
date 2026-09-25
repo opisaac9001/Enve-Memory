@@ -207,6 +207,19 @@ import Testing
         #expect(plan.remove == ["enve-memory.reminder.cleared"])
     }
 
+    @Test func provisionalRemindersStayWhileTheirEntryWaits() throws {
+        let waiting = UUID()
+        let sent = UUID()
+        let provisional = [
+            ReminderPlan.pendingRequest(entryID: waiting, title: "Queued", fireDate: now.addingTimeInterval(3600)),
+            ReminderPlan.pendingRequest(entryID: sent, title: "Flushed", fireDate: now.addingTimeInterval(3600)),
+        ].map { ScheduledReminder(identifier: $0.identifier, fireDate: $0.fireDate, title: $0.title) }
+        let plan = ReminderPlan.diff(items: [], scheduled: provisional, now: now, waiting: [waiting])
+        #expect(plan.add.isEmpty)
+        #expect(plan.remove == ["enve-memory.reminder.pending.\(sent.uuidString)"])
+        #expect(provisional[0].identifier.hasPrefix(ReminderPlan.identifierPrefix))
+    }
+
     @Test func keepsOnlyTheSoonestWithinTheSystemLimit() throws {
         let items = try (0..<80).map { i in
             try item("i\(i)", remind: JSONCoding.formatTimestamp(now.addingTimeInterval(Double(80 - i) * 3600)))

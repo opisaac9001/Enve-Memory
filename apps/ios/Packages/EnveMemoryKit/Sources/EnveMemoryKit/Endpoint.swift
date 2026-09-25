@@ -106,14 +106,22 @@ public struct FileUpload: Codable, Hashable, Sendable {
     public var note: String?
     public var project: String?
     public var tags: [String]
+    public var intent: Intent?
+    /// Sent as an exact ISO time, for the same reason as `CaptureRequest.remind`.
+    public var remind: Date?
+    public var pinned: Bool
 
-    public init(filename: String, mimeType: String, title: String? = nil, note: String? = nil, project: String? = nil, tags: [String] = []) {
+    public init(filename: String, mimeType: String, title: String? = nil, note: String? = nil, project: String? = nil, tags: [String] = [],
+                intent: Intent? = nil, remind: Date? = nil, pinned: Bool = false) {
         self.filename = filename
         self.mimeType = mimeType
         self.title = title
         self.note = note
         self.project = project
         self.tags = tags
+        self.intent = intent
+        self.remind = remind
+        self.pinned = pinned
     }
 }
 
@@ -213,6 +221,9 @@ extension Endpoint {
         if let note = file.note, !note.isEmpty { headers["X-Note"] = percentEncoded(note) }
         if let project = file.project, !project.isEmpty { headers["X-Project"] = percentEncoded(project) }
         if !file.tags.isEmpty { headers["X-Tags"] = percentEncoded(file.tags.joined(separator: ",")) }
+        if let intent = file.intent { headers["X-Intent"] = percentEncoded(intent.rawValue) }
+        if let remind = file.remind { headers["X-Remind"] = percentEncoded(JSONCoding.formatTimestamp(remind)) }
+        if file.pinned { headers["X-Pinned"] = "true" }
         return Endpoint(method: "POST", path: "/files", headers: headers)
     }
 

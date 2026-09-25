@@ -77,7 +77,7 @@ struct ShareView: View {
             TextField(model.isLink ? "Title" : "Title (optional)", text: $model.form.title)
                 .hearthField()
         }
-        if model.isLink {
+        if model.takesIntent {
             Overline("Keep it for")
             IntentChips(intent: $model.form.intent)
         }

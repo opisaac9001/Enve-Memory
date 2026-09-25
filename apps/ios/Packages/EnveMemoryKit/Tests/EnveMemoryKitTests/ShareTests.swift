@@ -145,6 +145,18 @@ import UniformTypeIdentifiers
         #expect(captures[1].endpoint.headers["X-Project"] == "p1")
     }
 
+    @Test func filesCarryIntentAndReminder() throws {
+        let at = try #require(JSONCoding.parseTimestamp("2026-09-26T16:00:00Z"))
+        let files = [
+            SharedFile(url: URL(filePath: "/tmp/a.jpg"), filename: "a.jpg", mimeType: "image/jpeg"),
+            SharedFile(url: URL(filePath: "/tmp/b.jpg"), filename: "b.jpg", mimeType: "image/jpeg"),
+        ]
+        let captures = try SharePayload.captures(for: .files(files), form: ShareForm(intent: .buy, remind: at))
+        #expect(captures.allSatisfy { $0.endpoint.headers["X-Intent"] == "buy" })
+        #expect(captures.allSatisfy { $0.endpoint.headers["X-Remind"] == "2026-09-26T16%3A00%3A00.000Z" })
+        #expect(Set(captures.compactMap(\.endpoint.idempotencyKey)).count == 2)
+    }
+
     @Test func singleFileKeepsTheTitle() throws {
         let file = SharedFile(url: URL(filePath: "/tmp/a.pdf"), filename: "a.pdf", mimeType: "application/pdf")
         let captures = try SharePayload.captures(for: .files([file]), form: ShareForm(title: "Opener manual"))
