@@ -154,3 +154,15 @@ test('ask tells the model which decisions were replaced', async () => {
   assert.match(prompt, /status="current" title="Switch to the ESP32-S3 controller"/);
   assert.match(provider.requests[0]!.system, /superseded/);
 });
+
+test('a superseded decision in the sources brings its replacement along', async () => {
+  const memory = open();
+  memory.projects.create({ name: 'Garage' });
+  const old = memory.decisions.record({ project: 'garage', decision: 'Use an ESP32 for the controller', reason: 'cheap' });
+  const middle = memory.decisions.record({ project: 'garage', decision: 'Switch to the S3 module', reason: 'USB', supersedes: [old.id] });
+  const latest = memory.decisions.record({ project: 'garage', decision: 'Settle on the C6 board', reason: 'Thread radio', supersedes: [middle.id] });
+  const provider = new FakeProvider(() => 'The C6 board [3].');
+  const result = await ask(memory, provider, 'ESP32 controller');
+  assert.deepEqual(new Set(result.sources.map((s) => s.id)), new Set([old.id, middle.id, latest.id]));
+  assert.match(provider.requests[0]!.prompt, /status="current" title="Settle on the C6 board"/);
+});

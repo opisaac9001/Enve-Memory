@@ -53,10 +53,20 @@ export function relevantPassages(text: string, question: string, budget = PER_SO
 export async function ask(memory: EnveMemory, provider: AiProvider, question: string, filter: ItemFilter = {}): Promise<Answer> {
   const hits = await memory.search.hybrid(question, filter, SOURCES);
   if (hits.length === 0) return { answer: "Nothing in your library matches that question.", sources: [] };
-  const sources = hits.map((hit, i) => {
-    const item = memory.items.get(hit.id);
-    return { n: i + 1, item, text: relevantPassages([item.body, item.content].filter(Boolean).join('\n\n'), question) };
-  });
+  const items = hits.map((hit) => memory.items.get(hit.id));
+  // A replaced decision alone would answer with history; bring in whatever replaced it, following the chain.
+  const seen = new Set(items.map((i) => i.id));
+  for (let i = 0; i < items.length; i++) {
+    for (const relation of items[i]!.relations) {
+      if (relation.kind === 'supersedes' && relation.direction === 'incoming' && !seen.has(relation.id)) {
+        seen.add(relation.id);
+        items.push(memory.items.get(relation.id));
+      }
+    }
+  }
+  const sources = items.map((item, i) => ({
+    n: i + 1, item, text: relevantPassages([item.body, item.content].filter(Boolean).join('\n\n'), question),
+  }));
   const prompt = [
     ...sources.map(({ n, item, text }) => {
       const replaced = item.type === 'decision' && item.relations.some((r) => r.kind === 'supersedes' && r.direction === 'incoming');
