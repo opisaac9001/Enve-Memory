@@ -52,16 +52,28 @@ public struct CaptureRequest: Codable, Hashable, Sendable {
     public var note: String?
     public var project: String?
     public var tags: [String]?
+    public var intent: Intent?
+    /// An ISO timestamp. The phone resolves "tomorrow" itself, so a capture that waits in the outbox keeps its meaning.
+    public var remind: String?
+    public var pinned: Bool?
 
-    public init(url: String? = nil, title: String? = nil, selection: String? = nil, note: String? = nil, project: String? = nil, tags: [String]? = nil) {
+    public init(url: String? = nil, title: String? = nil, selection: String? = nil, note: String? = nil, project: String? = nil,
+                tags: [String]? = nil, intent: Intent? = nil, remind: Date? = nil, pinned: Bool? = nil) {
         self.url = url
         self.title = title
         self.selection = selection
         self.note = note
         self.project = project
         self.tags = tags
+        self.intent = intent
+        self.remind = remind.map(JSONCoding.formatTimestamp)
+        self.pinned = pinned
     }
 }
+
+private struct PinBody: Encodable { let pinned: Bool }
+private struct ReminderBody: Encodable { let at: String? }
+private struct IntentBody: Encodable { let intent: Intent? }
 
 public struct NewItemRequest: Codable, Hashable, Sendable {
     public var type: ItemType
@@ -112,17 +124,48 @@ public struct ItemFilter: Hashable, Sendable {
     public var limit: Int?
     /// `Item.pageCursor` of the last item on the previous page (`/items` only).
     public var before: String?
+    public var shelf: Shelf?
 
-    public init(project: String? = nil, type: ItemType? = nil, tag: String? = nil, limit: Int? = nil, before: String? = nil) {
+    public init(project: String? = nil, type: ItemType? = nil, tag: String? = nil, limit: Int? = nil, before: String? = nil, shelf: Shelf? = nil) {
         self.project = project
         self.type = type
         self.tag = tag
         self.limit = limit
         self.before = before
+        self.shelf = shelf
     }
 
     var query: [(String, String?)] {
         [("project", project), ("type", type?.rawValue), ("tag", tag), ("limit", limit.map(String.init)), ("before", before)]
+            + (shelf?.query ?? [])
+    }
+}
+
+/// Curated slices of `/items`. Shelves sort by their own key (pin time, reminder time), so they aren't paged by `before`.
+public enum Shelf: Hashable, Sendable, Identifiable {
+    case pinned
+    case intent(Intent)
+    case unopened(days: Int)
+    case reminders
+
+    public static let all: [Shelf] = [.pinned, .intent(.read), .intent(.watch), .intent(.buy), .intent(.revisit), .unopened(days: 30), .reminders]
+
+    public var id: String {
+        switch self {
+        case .pinned: "pinned"
+        case .intent(let intent): "intent-\(intent.rawValue)"
+        case .unopened(let days): "unopened-\(days)"
+        case .reminders: "reminders"
+        }
+    }
+
+    var query: [(String, String?)] {
+        switch self {
+        case .pinned: [("pinned", "true")]
+        case .intent(let intent): [("intent", intent.rawValue)]
+        case .unopened(let days): [("unopened", String(days))]
+        case .reminders: [("reminders", "true")]
+        }
     }
 }
 
@@ -142,6 +185,9 @@ extension Endpoint {
     public static func item(_ id: String) -> Endpoint { get("/items/\(segment(id))") }
     public static func itemFile(_ id: String) -> Endpoint { get("/items/\(segment(id))/file") }
     public static let projects = get("/projects")
+    public static func reminders(dueOnly: Bool = false, limit: Int? = nil) -> Endpoint {
+        get("/reminders", [("due", dueOnly ? "true" : nil), ("limit", limit.map(String.init))])
+    }
     public static func briefing(_ ref: String) -> Endpoint { get("/projects/\(segment(ref))") }
 
     public static func tasks(project: String? = nil, status: TaskListStatus = .active, limit: Int? = nil, offset: Int = 0) -> Endpoint {
@@ -152,6 +198,14 @@ extension Endpoint {
     public static func capture(_ request: CaptureRequest) throws -> Endpoint { try json("POST", "/capture", request) }
     public static func createItem(_ request: NewItemRequest) throws -> Endpoint { try json("POST", "/items", request) }
     public static func completeTask(_ id: String) -> Endpoint { post("/tasks/\(segment(id))/complete") }
+    public static func pin(_ id: String, _ pinned: Bool) throws -> Endpoint { try json("POST", "/items/\(segment(id))/pin", PinBody(pinned: pinned)) }
+    /// `nil` clears the reminder (the key is omitted, which the server reads as null).
+    public static func setReminder(_ id: String, at date: Date?) throws -> Endpoint {
+        try json("PUT", "/items/\(segment(id))/reminder", ReminderBody(at: date.map(JSONCoding.formatTimestamp)))
+    }
+    public static func setIntent(_ id: String, _ intent: Intent?) throws -> Endpoint { try json("PUT", "/items/\(segment(id))/intent", IntentBody(intent: intent)) }
+    public static func acceptSuggestions(_ id: String) -> Endpoint { post("/items/\(segment(id))/accept") }
+    public static func opened(_ id: String) -> Endpoint { post("/items/\(segment(id))/opened") }
 
     public static func upload(_ file: FileUpload) -> Endpoint {
         var headers = ["Content-Type": file.mimeType, "X-Filename": percentEncoded(file.filename), idempotencyHeader: newKey()]

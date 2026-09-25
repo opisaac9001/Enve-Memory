@@ -106,6 +106,24 @@ import UniformTypeIdentifiers
         #expect(body.note == nil)
     }
 
+    @Test func linkCarriesIntentAndReminder() throws {
+        let at = try #require(JSONCoding.parseTimestamp("2026-09-26T17:00:00Z"))
+        let captures = try SharePayload.captures(for: .link(URL(string: "https://example.com/v")!, title: nil),
+                                                 form: ShareForm(intent: .watch, remind: at))
+        let body = try JSONCoding.makeDecoder().decode(CaptureRequest.self, from: #require(captures[0].endpoint.body))
+        #expect(body.intent == .watch)
+        #expect(body.remind == "2026-09-26T17:00:00.000Z")
+        #expect(captures[0].endpoint.idempotencyKey != nil)
+    }
+
+    @Test func textTakesAReminderButNoIntent() throws {
+        let at = try #require(JSONCoding.parseTimestamp("2026-09-26T17:00:00Z"))
+        let captures = try SharePayload.captures(for: .text("x"), form: ShareForm(intent: .buy, remind: at))
+        let body = try JSONCoding.makeDecoder().decode(CaptureRequest.self, from: #require(captures[0].endpoint.body))
+        #expect(body.intent == nil)
+        #expect(body.remind == "2026-09-26T17:00:00.000Z")
+    }
+
     @Test func textIsSentAsASelection() throws {
         let captures = try SharePayload.captures(for: .text("quoted words"), form: ShareForm(note: "why I kept this"))
         let body = try JSONCoding.makeDecoder().decode(CaptureRequest.self, from: #require(captures[0].endpoint.body))

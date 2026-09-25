@@ -31,6 +31,9 @@ struct ItemDetailView: View {
         .toolbar(.visible, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if let item = detail?.item {
+                ToolbarItem(placement: .primaryAction) { PinButton(item: item) }
+            }
             if let url = detail?.item.url.flatMap(URL.init(string:)) {
                 ToolbarItem(placement: .primaryAction) {
                     ShareLink(item: url)
@@ -65,6 +68,7 @@ struct ItemDetailView: View {
             do {
                 let folder = URL.cachesDirectory.appending(path: "Attachments", directoryHint: .isDirectory)
                 preview = try await client.download(attachment, itemID: itemID, into: folder)
+                if let item = detail?.item { ItemActions(outbox: outbox, router: router).markOpened(item) }
             } catch {
                 router.show(error.localizedDescription)
             }
@@ -90,6 +94,7 @@ private struct ItemDetailContent: View {
     let complete: () -> Void
 
     @Environment(Router.self) private var router
+    @Environment(OutboxService.self) private var outbox
     @Environment(\.openURL) private var openURL
     @Environment(\.hearth) private var hearth
 
@@ -98,6 +103,10 @@ private struct ItemDetailContent: View {
     var body: some View {
         header
         if let task = item.task { taskCard(task) }
+        if item.task == nil, item.type != .decision { OrganizeCard(item: item) }
+        if let ai = item.metadata.ai, ai.isReady, ai.summary?.isEmpty == false || ai.isPending {
+            SuggestionsCard(ai: ai, itemID: item.id)
+        }
         if !note.isEmpty {
             Overline(item.type == .bookmark || item.type == .file ? "Your note" : "Note")
             HearthCard(padding: HearthSpacing.xl) { MarkdownView(document: note) }
@@ -129,6 +138,7 @@ private struct ItemDetailContent: View {
             if let url = item.url.flatMap(URL.init(string:)) {
                 Button {
                     openURL(url)
+                    ItemActions(outbox: outbox, router: router).markOpened(item)
                 } label: {
                     Label("Open original", systemImage: "safari")
                 }

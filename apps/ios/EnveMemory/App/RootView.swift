@@ -11,7 +11,7 @@ struct RootView: View {
     var body: some View {
         content
             .overlay(alignment: .top) { ToastView() }
-            .onOpenURL(perform: handle)
+            .onOpenURL { router.handle($0) }
             .modifier(PairingPrompts())
             .task { await outbox.reload() }
             .environment(\.hearth, palette)
@@ -32,14 +32,6 @@ struct RootView: View {
         }
     }
 
-    private func handle(_ url: URL) {
-        guard url.scheme == PairingLink.scheme else { return }
-        do {
-            router.pendingPairLink = try PairingLink(url: url)
-        } catch {
-            router.show(error.localizedDescription)
-        }
-    }
 }
 
 /// Tabs under the floating dock. Each tab keeps its own navigation path.
@@ -48,6 +40,7 @@ struct MainView: View {
     @Environment(Connection.self) private var connection
     @Environment(OutboxService.self) private var outbox
     @Environment(ProjectStore.self) private var projects
+    @Environment(ReminderScheduler.self) private var reminders
     @Environment(\.hearth) private var hearth
 
     private let dockHeight: CGFloat = 92
@@ -62,13 +55,17 @@ struct MainView: View {
             }
             .id(router.selectedTab)
 
-            MantelDock(selection: $router.selectedTab)
+            MantelDock(selection: $router.selectedTab) { router.paths[$0] = NavigationPath() }
                 .padding(.bottom, HearthSpacing.xs)
         }
         .environment(\.bottomBarInset, dockHeight)
         .sheet(item: $router.capture) { kind in
             CaptureSheet(initialKind: kind)
                 .environment(\.hearth, hearth)
+        }
+        .task(id: connection.revision) {
+            await reminders.refreshAuthorization()
+            await reminders.sync(connection.client)
         }
         .task(id: connection.pairing) {
             // Keeps the share sheet's project list current for this library.
@@ -95,12 +92,16 @@ struct MainView: View {
         }
     }
 
-    @ViewBuilder
+    /// Keyed by route: a deep link that swaps the item at the same depth must not reuse the old screen's state.
     private func destination(_ route: Route) -> some View {
-        switch route {
-        case .item(let id): ItemDetailView(itemID: id)
-        case .project(let id): ProjectBriefingView(projectID: id)
+        Group {
+            switch route {
+            case .item(let id): ItemDetailView(itemID: id)
+            case .project(let id): ProjectBriefingView(projectID: id)
+            case .shelf(let shelf): ShelfView(shelf: shelf)
+            }
         }
+        .id(route)
     }
 }
 

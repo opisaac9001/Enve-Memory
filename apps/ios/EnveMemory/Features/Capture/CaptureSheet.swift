@@ -10,6 +10,7 @@ struct CaptureSheet: View {
     @Environment(Router.self) private var router
     @Environment(\.hearth) private var hearth
     @Environment(\.dismiss) private var dismiss
+    @Environment(ReminderScheduler.self) private var reminders
 
     @State private var kind: CaptureKind = .note
     @State private var title = ""
@@ -20,6 +21,8 @@ struct CaptureSheet: View {
     @State private var hasDue = false
     @State private var due = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now
     @State private var priority = TaskPriority.normal
+    @State private var intent: Intent?
+    @State private var remind: ReminderPreset?
     @State private var saving = false
     @FocusState private var focus: Field?
 
@@ -34,6 +37,14 @@ struct CaptureSheet: View {
                     }
                     .pickerStyle(.segmented)
                     fields
+                    if kind == .link {
+                        Overline("Keep it for")
+                        IntentChips(intent: $intent)
+                    }
+                    if kind != .task {
+                        Overline("Remind me")
+                        ReminderChips(preset: $remind)
+                    }
                     ProjectPicker(projectID: $projectID, projects: projects.refs)
                     TextField("Tags, comma separated", text: $tags)
                         .textInputAutocapitalization(.never)
@@ -141,11 +152,13 @@ struct CaptureSheet: View {
         let label: String
         switch kind {
         case .note:
-            endpoint = try? .createItem(NewItemRequest(type: .note, title: title, body: body ?? "", project: projectID, tags: tagList))
+            endpoint = try? .capture(CaptureRequest(title: title, note: body ?? "", project: projectID, tags: tagList.isEmpty ? nil : tagList,
+                                                    remind: remind?.date()))
             label = title ?? String((body ?? "").prefix(60))
         case .link:
             let link = linkURL?.absoluteString ?? url
-            endpoint = try? .capture(CaptureRequest(url: link, title: title, note: body, project: projectID, tags: tagList.isEmpty ? nil : tagList))
+            endpoint = try? .capture(CaptureRequest(url: link, title: title, note: body, project: projectID, tags: tagList.isEmpty ? nil : tagList,
+                                                    intent: intent, remind: remind?.date()))
             label = title ?? link
         case .task:
             endpoint = try? .createItem(NewItemRequest(type: .task, title: title, body: body, project: projectID, tags: tagList,
@@ -155,7 +168,9 @@ struct CaptureSheet: View {
         guard let endpoint else { return }
         SharedSettings().lastProjectID = projectID
         saving = true
+        let wantsReminder = remind != nil && kind != .task
         Task {
+            if wantsReminder { await reminders.requestAuthorizationIfNeeded() }
             let outcome = await outbox.submit(endpoint, kind: OutboxEntry.Kind(kind), title: label)
             saving = false
             if router.report(outcome, sent: "\(kind.title) saved") { dismiss() }

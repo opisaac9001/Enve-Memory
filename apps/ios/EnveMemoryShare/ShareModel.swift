@@ -32,6 +32,18 @@ final class ShareModel {
         if case .link = content { true } else { false }
     }
 
+    /// The reminder chip; resolved to a date when it's picked so a queued share keeps its meaning.
+    var remindPreset: ReminderPreset? {
+        didSet { form.remind = remindPreset?.date() }
+    }
+
+    var takesReminder: Bool {
+        switch content {
+        case .link, .text: true
+        case .files, nil: false
+        }
+    }
+
     var takesTitle: Bool {
         switch content {
         case .link, .text: true

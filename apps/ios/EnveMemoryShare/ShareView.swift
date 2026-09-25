@@ -77,6 +77,14 @@ struct ShareView: View {
             TextField(model.isLink ? "Title" : "Title (optional)", text: $model.form.title)
                 .hearthField()
         }
+        if model.isLink {
+            Overline("Keep it for")
+            IntentChips(intent: $model.form.intent)
+        }
+        if model.takesReminder {
+            Overline("Remind me")
+            ReminderChips(preset: $model.remindPreset)
+        }
         ProjectPicker(projectID: $model.form.projectID, projects: model.projects)
         TextField("Tags, comma separated", text: $model.form.tags)
             .textInputAutocapitalization(.never)

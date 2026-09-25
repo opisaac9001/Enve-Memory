@@ -20,6 +20,7 @@ struct HomeView: View {
             QuickCaptureBar()
             if outbox.pendingCount > 0 { OutboxBanner() }
             if let loadError { ErrorBanner(message: loadError) { Task { await load() } } }
+            ShelvesSection()
             recent
         }
         .refreshable { await load() }

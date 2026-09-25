@@ -19,12 +19,18 @@ public struct ShareForm: Hashable, Sendable {
     public var note: String
     public var projectID: String?
     public var tags: String
+    /// Links only.
+    public var intent: Intent?
+    /// Links and text; `/files` has no reminder field.
+    public var remind: Date?
 
-    public init(title: String = "", note: String = "", projectID: String? = nil, tags: String = "") {
+    public init(title: String = "", note: String = "", projectID: String? = nil, tags: String = "", intent: Intent? = nil, remind: Date? = nil) {
         self.title = title
         self.note = note
         self.projectID = projectID
         self.tags = tags
+        self.intent = intent
+        self.remind = remind
     }
 }
 
@@ -53,10 +59,11 @@ public enum SharePayload {
         let tags = Tags.parse(form.tags)
         switch content {
         case .link(let url, let pageTitle):
-            let request = CaptureRequest(url: url.absoluteString, title: title ?? pageTitle, note: note, project: form.projectID, tags: tags.nilIfEmpty)
+            let request = CaptureRequest(url: url.absoluteString, title: title ?? pageTitle, note: note, project: form.projectID, tags: tags.nilIfEmpty,
+                                         intent: form.intent, remind: form.remind)
             return [PendingCapture(endpoint: try .capture(request), kind: .link, title: title ?? pageTitle ?? url.host() ?? url.absoluteString, file: nil)]
         case .text(let text):
-            let request = CaptureRequest(title: title, selection: text, note: note, project: form.projectID, tags: tags.nilIfEmpty)
+            let request = CaptureRequest(title: title, selection: text, note: note, project: form.projectID, tags: tags.nilIfEmpty, remind: form.remind)
             return [PendingCapture(endpoint: try .capture(request), kind: .note, title: title ?? String(text.prefix(60)), file: nil)]
         case .files(let files):
             return files.map { file in

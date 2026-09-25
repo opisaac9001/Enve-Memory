@@ -40,12 +40,6 @@ extension ItemType {
 }
 
 extension Item {
-    var displayTitle: String {
-        if !title.isEmpty { return title }
-        if let url, let host = URL(string: url)?.host() { return host }
-        return body.isEmpty ? "Untitled" : String(body.prefix(80))
-    }
-
     /// One line of plain text under the title; nil when the title already is the body.
     var preview: String? {
         guard !title.isEmpty || url != nil else { return nil }
@@ -85,10 +79,21 @@ struct ItemRow: View {
         HStack(alignment: .top, spacing: HearthSpacing.md) {
             TypeGlyph(symbol: item.task?.status == .done ? "checkmark.circle.fill" : item.type.symbol)
             VStack(alignment: .leading, spacing: HearthSpacing.xs) {
-                Text(item.displayTitle)
-                    .font(HearthFont.cardTitle)
-                    .foregroundStyle(hearth.textPrimary)
-                    .lineLimit(2)
+                HStack(alignment: .firstTextBaseline, spacing: HearthSpacing.xs) {
+                    Text(item.displayTitle)
+                        .font(HearthFont.cardTitle)
+                        .foregroundStyle(hearth.textPrimary)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if item.isPinned {
+                        Image(systemName: "pin.fill").accessibilityLabel("Pinned")
+                    }
+                    if let remindAt = item.remindAt, remindAt > .now {
+                        Image(systemName: "bell.fill").accessibilityLabel("Reminder set")
+                    }
+                }
+                .font(HearthFont.caption)
+                .foregroundStyle(hearth.accent)
                 if let preview = item.preview {
                     Text(preview)
                         .font(HearthFont.footnote)
@@ -108,10 +113,14 @@ struct ItemRow: View {
     }
 
     private var meta: String {
-        var parts = [item.type.label]
+        var parts = [item.intent.map(\.label) ?? item.type.label]
         if showsProject, let project = item.project { parts.append(project.name) }
         if let site = item.metadata.siteName ?? item.url.flatMap({ URL(string: $0)?.host() }) { parts.append(site) }
-        parts.append(item.updatedAt.formatted(.relative(presentation: .named)))
+        if let remindAt = item.remindAt, remindAt > .now {
+            parts.append("Remind \(remindAt.formatted(.relative(presentation: .named)))")
+        } else {
+            parts.append(item.updatedAt.formatted(.relative(presentation: .named)))
+        }
         return parts.joined(separator: " · ")
     }
 }

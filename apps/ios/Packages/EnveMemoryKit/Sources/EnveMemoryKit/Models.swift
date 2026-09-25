@@ -52,6 +52,23 @@ public struct TaskPriority: RawRepresentable, Codable, Hashable, Sendable {
     public static let all: [TaskPriority] = [.high, .normal, .low]
 }
 
+/// Why the user kept something. Guessed for links (`ItemMetadata.intentAuto`) until the user picks one.
+public struct Intent: RawRepresentable, Codable, Hashable, Sendable {
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+    public init(from decoder: Decoder) throws { rawValue = try decoder.singleValueContainer().decode(String.self) }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
+    public static let read = Intent(rawValue: "read")
+    public static let watch = Intent(rawValue: "watch")
+    public static let buy = Intent(rawValue: "buy")
+    public static let revisit = Intent(rawValue: "revisit")
+    public static let all: [Intent] = [.read, .watch, .buy, .revisit]
+}
+
 public struct ServerStatus: Codable, Hashable, Sendable {
     public let name: String
     public let version: String
@@ -108,8 +125,25 @@ public struct ItemMetadata: Codable, Hashable, Sendable {
     public var pageCount: Int?
     public var finalUrl: String?
     public var ingest: IngestState?
+    /// True while `Item.intent` is the server's guess rather than the user's choice.
+    public var intentAuto: Bool?
+    public var ai: AISuggestions?
 
     public init() {}
+}
+
+/// Summary, tags and project proposed by the optional AI enrichment; applied only when the user accepts.
+public struct AISuggestions: Codable, Hashable, Sendable {
+    public let status: String
+    public let model: String?
+    public let summary: String?
+    public let tags: [String]?
+    public let project: ProjectRef?
+    public let error: String?
+    public let accepted: Bool?
+
+    public var isReady: Bool { status == "done" }
+    public var isPending: Bool { isReady && accepted != true && (!(tags ?? []).isEmpty || project != nil) }
 }
 
 public struct TaskFields: Codable, Hashable, Sendable {
@@ -136,6 +170,11 @@ public struct Item: Decodable, Hashable, Identifiable, Sendable {
     public let updatedAt: Date
     public let archivedAt: Date?
     public let task: TaskFields?
+    public let tags: [String]
+    public let intent: Intent?
+    public let pinnedAt: Date?
+    public let openedAt: Date?
+    public let remindAt: Date?
     /// `updatedAt` exactly as the server sent it; the paging cursor compares strings, so a re-formatted date could skip items.
     public let updatedAtStamp: String
 
@@ -144,7 +183,10 @@ public struct Item: Decodable, Hashable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, url, project, source, metadata, createdAt, updatedAt, archivedAt, task
+        case tags, intent, pinnedAt, openedAt, remindAt
     }
+
+    public var isPinned: Bool { pinnedAt != nil }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -161,6 +203,11 @@ public struct Item: Decodable, Hashable, Identifiable, Sendable {
         updatedAtStamp = try c.decode(String.self, forKey: .updatedAt)
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
         task = try c.decodeIfPresent(TaskFields.self, forKey: .task)
+        tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
+        intent = try c.decodeIfPresent(Intent.self, forKey: .intent)
+        pinnedAt = try c.decodeIfPresent(Date.self, forKey: .pinnedAt)
+        openedAt = try c.decodeIfPresent(Date.self, forKey: .openedAt)
+        remindAt = try c.decodeIfPresent(Date.self, forKey: .remindAt)
     }
 }
 
@@ -220,6 +267,8 @@ public struct SearchHit: Codable, Hashable, Identifiable, Sendable {
     public let match: Match
     public let taskStatus: TaskStatus?
     public let updatedAt: Date
+    /// The start of the user's own note, for hits without a title.
+    public let preview: String?
 }
 
 public struct Decision: Codable, Hashable, Identifiable, Sendable {

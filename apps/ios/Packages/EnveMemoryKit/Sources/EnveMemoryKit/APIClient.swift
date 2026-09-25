@@ -79,6 +79,7 @@ extension APIClient {
     public func items(_ filter: ItemFilter = .init()) async throws -> [Item] { try await send(.items(filter)) }
     public func item(_ id: String) async throws -> ItemDetail { try await send(.item(id)) }
     public func projects() async throws -> [Project] { try await send(.projects) }
+    public func reminders(limit: Int? = nil) async throws -> [Item] { try await send(.reminders(limit: limit)) }
     public func briefing(_ projectRef: String) async throws -> ProjectBriefing { try await send(.briefing(projectRef)) }
     public func tasks(project: String? = nil, status: TaskListStatus = .active, limit: Int? = nil, offset: Int = 0) async throws -> [Item] {
         try await send(.tasks(project: project, status: status, limit: limit, offset: offset))

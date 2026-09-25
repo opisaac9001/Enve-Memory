@@ -40,6 +40,7 @@ enum AppTab: String, CaseIterable, Identifiable {
 enum Route: Hashable {
     case item(String)
     case project(String)
+    case shelf(Shelf)
 }
 
 enum CaptureKind: String, CaseIterable, Identifiable {
@@ -80,6 +81,27 @@ final class Router {
 
     func open(_ route: Route) {
         paths[selectedTab, default: NavigationPath()].append(route)
+    }
+
+    /// Pairing links and `enve-memory://item/<id>` (from reminder notifications).
+    func handle(_ url: URL) {
+        if let id = ItemLink.itemID(from: url) {
+            openItem(id)
+            return
+        }
+        guard url.scheme == PairingLink.scheme else { return }
+        do {
+            pendingPairLink = try PairingLink(url: url)
+        } catch {
+            show(error.localizedDescription)
+        }
+    }
+
+    func openItem(_ id: String) {
+        selectedTab = .home
+        var path = NavigationPath()
+        path.append(Route.item(id))
+        paths[.home] = path
     }
 
     func show(_ message: String) {

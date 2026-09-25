@@ -3,6 +3,8 @@ import SwiftUI
 /// The Hearth floating pill tab bar.
 struct MantelDock: View {
     @Binding var selection: AppTab
+    /// Tapping the current tab again returns it to its root.
+    var onReselect: (AppTab) -> Void = { _ in }
 
     @Environment(\.hearth) private var hearth
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -32,7 +34,9 @@ struct MantelDock: View {
     private func item(_ tab: AppTab) -> some View {
         let isSelected = selection == tab
         return Button {
-            if reduceMotion {
+            if isSelected {
+                onReselect(tab)
+            } else if reduceMotion {
                 selection = tab
             } else {
                 withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) { selection = tab }

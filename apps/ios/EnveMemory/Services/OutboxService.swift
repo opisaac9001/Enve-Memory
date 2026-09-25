@@ -28,11 +28,12 @@ final class OutboxService {
         entries = await outbox.entries()
     }
 
-    func submit(_ endpoint: Endpoint, kind: OutboxEntry.Kind, title: String, file: URL? = nil) async -> Outcome {
+    /// `refresh: false` for signals (like "opened") that shouldn't make screens reload.
+    func submit(_ endpoint: Endpoint, kind: OutboxEntry.Kind, title: String, file: URL? = nil, refresh: Bool = true) async -> Outcome {
         if let client = connection.client {
             do {
                 let data = try await client.data(for: endpoint, uploadingFile: file)
-                connection.didWrite()
+                if refresh { connection.didWrite() }
                 return .sent(data)
             } catch let error as APIError where error.isRetryable {
                 connection.note(error)

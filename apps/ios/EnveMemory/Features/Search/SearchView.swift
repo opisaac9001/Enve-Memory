@@ -134,11 +134,10 @@ private struct SearchHitRow: View {
         HStack(alignment: .top, spacing: HearthSpacing.md) {
             TypeGlyph(symbol: hit.taskStatus == .done ? "checkmark.circle.fill" : hit.type.symbol)
             VStack(alignment: .leading, spacing: HearthSpacing.xs) {
-                // Untitled notes lead with their matching text instead of "Untitled".
-                Text(hit.title.isEmpty ? Snippet.attributed(hit.snippet, highlight: hearth.accent) : AttributedString(hit.title))
+                Text(heading)
                     .font(HearthFont.cardTitle)
-                    .lineLimit(hit.title.isEmpty ? 3 : 2)
-                if !hit.title.isEmpty, !hit.snippet.isEmpty, hit.snippet.filter({ $0 != "[" && $0 != "]" }) != hit.title {
+                    .lineLimit(2)
+                if !hit.snippet.isEmpty, hit.snippet.filter({ $0 != "[" && $0 != "]" }) != heading {
                     Text(Snippet.attributed(hit.snippet, highlight: hearth.accent))
                         .font(HearthFont.footnote)
                         .foregroundStyle(hearth.textSecondary)
@@ -156,6 +155,13 @@ private struct SearchHitRow: View {
         .padding(.vertical, HearthSpacing.sm)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+
+    /// Untitled notes lead with the start of the note.
+    private var heading: String {
+        if !hit.title.isEmpty { return hit.title }
+        let preview = hit.preview?.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces) ?? ""
+        return preview.isEmpty ? hit.type.label : preview
     }
 
     private var meta: String {
