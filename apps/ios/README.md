@@ -2,17 +2,19 @@
 
 The phone companion for Enve Memory. The library stays on your computer; the phone is a client of the local HTTP API (`enve-memory serve --lan`) over your home network or Tailscale. It keeps only its pairing token (Keychain) and an outbox of captures that couldn't be sent yet.
 
-| Home | Search | Project briefing |
+| Home | Project briefing | Item detail |
 |---|---|---|
-| ![Home](docs/home.png) | ![Search](docs/search.png) | ![Project briefing](docs/briefing.png) |
+| ![Home: shelves and recent items](../../docs/screenshots/ios/home.png) | ![Garage Door Controller briefing](../../docs/screenshots/ios/project.png) | ![A pinned link with a reminder and its archived text](../../docs/screenshots/ios/item.png) |
 
-| Decisions and tasks | Item detail | Settings |
+| Search | Reminders | Watch shelf |
 |---|---|---|
-| ![Decisions](docs/briefing-decisions.png) | ![Item](docs/item.png) | ![Settings](docs/settings.png) |
+| ![Search](../../docs/screenshots/ios/search.png) | ![Reminders shelf](../../docs/screenshots/ios/reminders.png) | ![Watch shelf](../../docs/screenshots/ios/shelf-watch.png) |
 
-| Pin, intent and reminder | Reminders shelf |
-|---|---|
-| ![Organize](docs/item-organize.png) | ![Reminders](docs/shelf-reminders.png) |
+| Share sheet | Settings | Paper mode |
+|---|---|---|
+| ![Saving a link from Safari with intent and reminder](../../docs/screenshots/ios/share.png) | ![Settings, connected](../../docs/screenshots/ios/settings.png) | ![Home in Paper mode](../../docs/screenshots/ios/home-light.png) |
+
+Screenshots use the fictional demo library from `node scripts/demo-library.ts <empty folder>`.
 
 ## Requirements
 

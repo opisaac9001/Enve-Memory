@@ -138,15 +138,17 @@ private struct SearchHitRow: View {
                     .font(HearthFont.cardTitle)
                     .lineLimit(2)
                 if !hit.snippet.isEmpty, hit.snippet.filter({ $0 != "[" && $0 != "]" }) != heading {
-                    Text(Snippet.attributed(hit.snippet, highlight: hearth.accent))
+                    Text(Snippet.attributed(hit.snippet, highlight: hearth.accent, title: hit.title))
                         .font(HearthFont.footnote)
                         .foregroundStyle(hearth.textSecondary)
                         .lineLimit(3)
                 }
                 HStack(spacing: HearthSpacing.xs) {
                     Text(meta)
+                        .lineLimit(1)
                     Spacer(minLength: HearthSpacing.sm)
                     matchBadge
+                        .fixedSize()
                 }
                 .font(HearthFont.caption)
                 .foregroundStyle(hearth.textTertiary)
@@ -165,8 +167,7 @@ private struct SearchHitRow: View {
     }
 
     private var meta: String {
-        [hit.type.label, hit.project?.name, hit.updatedAt.formatted(.relative(presentation: .named))]
-            .compactMap(\.self).joined(separator: " · ")
+        [hit.type.label, hit.project?.name].compactMap(\.self).joined(separator: " · ")
     }
 
     private var matchBadge: some View {

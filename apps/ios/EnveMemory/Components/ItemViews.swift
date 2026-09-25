@@ -103,7 +103,7 @@ struct ItemRow: View {
                 Text(meta)
                     .font(HearthFont.caption)
                     .foregroundStyle(hearth.textTertiary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -193,10 +193,16 @@ struct ErrorBanner: View {
 
 /// Search snippets mark matched terms with `[` `]`.
 enum Snippet {
-    static func attributed(_ snippet: String, highlight: Color) -> AttributedString {
-        let flat = snippet
-            .replacingOccurrences(of: "\n", with: " ")
-            .replacingOccurrences(of: "  ", with: " ")
+    /// `title` is dropped where the snippet merely repeats it (meaning matches start with the item's title).
+    static func attributed(_ snippet: String, highlight: Color, title: String = "") -> AttributedString {
+        // Snippets are cut from Markdown; drop heading, fence and table marks so they read as prose.
+        var flat = snippet
+            .replacing(/#{1,6} |```|\|/, with: " ")
+            .replacing(/\s+/, with: " ")
+            .trimmingCharacters(in: .whitespaces)
+        while !title.isEmpty, flat.count > title.count, flat.hasPrefix(title) {
+            flat = String(flat.dropFirst(title.count)).trimmingCharacters(in: .whitespaces)
+        }
         var result = AttributedString()
         var buffer = ""
         var inMatch = false
