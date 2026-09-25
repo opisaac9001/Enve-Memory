@@ -2,9 +2,19 @@
 
 **An open, local memory layer for you and your AI tools.**
 
-Save links, notes, tasks and decisions once. Find them yourself, or let Claude, Codex, Cursor or any other MCP client find and use them. Every assistant reads and writes the same library, and that library is a single SQLite file on your computer. No account, no subscription, no cloud.
+Save links, notes, files, tasks and decisions once. Find them yourself, or let Claude, Codex, ChatGPT, Cursor or any other MCP client find and use them. Every assistant reads and writes the same library, and that library is a single SQLite file on your computer. No account, no subscription, no cloud.
 
-> Status: early but broad. Working today: the core library, CLI, MCP server, local HTTP API, link and PDF archiving, local semantic search, the browser extension, optional AI (bring your own provider), backups and export, encrypted folder sync between computers, importers, and automation rules. The desktop app and the iOS companion are in progress. See [docs/ROADMAP.md](docs/ROADMAP.md).
+## What you get
+
+- **Capture from anywhere.** The desktop app (quick-capture window, drag and drop), the browser extension (popup, side panel, right-click, one-click import of your browser bookmarks, offline queue), the iOS app and its share sheet, the CLI, and any AI tool over MCP.
+- **Pages that outlive the web.** Saved links are fetched and stored as readable Markdown, and PDFs and text files are extracted, so everything stays searchable even after the original page disappears.
+- **Search by words and by meaning.** Full-text search plus a local embedding model (no cloud), fused so both exact terms and paraphrases surface, with a relevance floor so irrelevant results don't crowd in.
+- **Project memory for AI agents.** Each project has standing instructions, a living memory document (every version kept), an append-only decision log, tasks, and a briefing an agent reads in one call.
+- **Shelves and reminders.** Pinned, Read, Watch, Buy, Revisit, "unopened for a month". Reminders take plain words ("tomorrow", "friday") and notify on the desktop, the phone or in the browser.
+- **Optional AI, bring your own.** Ollama, OpenAI, Anthropic, Gemini, OpenRouter or any OpenAI-compatible server for summaries, tag and project suggestions (or automatic filing), and cited answers from your own library. Everything else works with AI off.
+- **Automations.** For example, "links from github.com → #code, file into Development".
+- **Sync between your computers** through a folder you already sync (iCloud Drive, Dropbox, Syncthing), with optional passphrase encryption. Concurrent edits never lose text.
+- **Yours to keep.** Automatic hourly, daily and monthly backups; Export Everything to Markdown, JSON and the original files; importers for browser bookmarks, Markdown folders or Obsidian vaults, bookmark CSVs, and Enve exports.
 
 ## Try it
 
@@ -20,15 +30,17 @@ npm run cli -- project show garage
 npm run cli -- search opener protocol
 ```
 
+The desktop app is in [`apps/desktop`](apps/desktop): `npm --prefix apps/desktop run dev`, or `run dist:mac` for the installers. The browser extension is in [`apps/extension`](apps/extension) and the iOS app in [`apps/ios`](apps/ios); each README explains setup.
+
 ## Connect your AI
 
 ```bash
 npm run cli -- connect
 ```
 
-This prints ready-to-paste setup for Claude Code, Codex and JSON-configured clients such as Claude Desktop and Cursor. Then ask your assistant *"What do we know about my garage door project?"*
+This prints ready-to-paste setup for Claude Code, Codex and JSON-configured clients such as Claude Desktop and Cursor. The desktop app has the same setup under Settings → AI tools, with one-click "Add to Claude Code". Then ask your assistant *"What do we know about my garage door project?"*
 
-The server exposes 20 tools: search, briefings, notes, links, tasks, project memory, and an append-only decision log. None of them can delete anything. See [docs/MCP.md](docs/MCP.md).
+The MCP server has about 25 tools: search, briefings, notes, links, files, tasks, project memory, decisions, reminders and shelves. None of them can delete anything, and saved content is always presented to the model as data, never instructions. See [docs/MCP.md](docs/MCP.md). Devices and remote agents use the local [HTTP API](docs/API.md) with scoped tokens.
 
 ## Where your data lives
 
@@ -38,7 +50,7 @@ The server exposes 20 tools: search, briefings, notes, links, tasks, project mem
 | Windows | `%APPDATA%\Enve Memory\` |
 | Linux | `~/.config/Enve Memory/` |
 
-Override it with `--home DIR` or `ENVE_MEMORY_HOME`. Snapshots are taken automatically (hourly, daily and monthly) while the app or `serve` runs, and before any schema upgrade. `enve-memory export <folder>` writes everything as Markdown, JSON and the original files.
+Override it with `--home DIR` or `ENVE_MEMORY_HOME`.
 
 ## Docs
 
