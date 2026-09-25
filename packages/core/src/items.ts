@@ -69,14 +69,21 @@ export class ItemService {
     return this.get(this.insert({ type: 'note', body, title: input.title, project: input.project, tags: input.tags }));
   }
 
-  /** Saving a URL that is already bookmarked returns the existing bookmark, with any new tags added. */
+  /** Saving a URL that is already bookmarked returns the existing bookmark, appending any new note and adding any new tags. */
   saveLink(input: SaveLinkInput): { item: ItemDetail; created: boolean } {
     const url = parseUrl(input.url);
     const existing = this.ctx.get<{ id: string }>(
       `SELECT id FROM items WHERE type = 'bookmark' AND url = ? AND archived_at IS NULL ORDER BY seq LIMIT 1`, url,
     );
     if (existing) {
-      if (input.tags?.length) this.tag(existing.id, { add: input.tags });
+      this.ctx.tx(() => {
+        const note = input.note?.trim();
+        if (note) {
+          const row = this.row(existing.id);
+          if (!row.body.includes(note)) this.write(row, { body: row.body ? `${row.body}\n\n${note}` : note }, 'update');
+        }
+        if (input.tags?.length) this.tag(existing.id, { add: input.tags });
+      });
       return { item: this.get(existing.id), created: false };
     }
     const id = this.insert({

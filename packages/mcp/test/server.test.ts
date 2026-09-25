@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { EnveMemory } from '@enve-memory/core';
-import { createServer } from '@enve-memory/mcp';
+import { type ServerAccess, createServer } from '@enve-memory/mcp';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 
-async function connect() {
+async function connect(access?: ServerAccess) {
   const memory = EnveMemory.open({ inMemory: true, actor: 'test' });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  await createServer(memory, '0.0.0-test').connect(serverSide);
+  await createServer(memory, '0.0.0-test', access).connect(serverSide);
   const client = new Client({ name: 'test-agent', version: '1.0.0' });
   await client.connect(clientSide);
   const call = async (name: string, args: Record<string, unknown> = {}) => {
@@ -86,4 +86,14 @@ test('long bodies are previewed in lists but complete in get_item', async () => 
   const [listed] = await call('list_items', {});
   assert.ok(listed.preview.length < 300);
   assert.equal((await call('get_item', { id: note.id })).body, body);
+});
+
+test('scopes decide which tools a client can see', async () => {
+  const names = async (access: ServerAccess) => (await (await connect(access)).client.listTools()).tools.map((t) => t.name).sort();
+  const readOnly = await names({ scopes: ['read'] });
+  assert.ok(readOnly.includes('search') && readOnly.includes('get_project'));
+  assert.equal(readOnly.some((n) => n.startsWith('save_') || n.startsWith('create_') || n.startsWith('update_')), false);
+  assert.deepEqual(await names({ scopes: ['capture'] }), ['create_task', 'save_link', 'save_note']);
+  const writer = await names({ scopes: ['write'] });
+  assert.ok(writer.includes('save_note') && writer.includes('set_project_memory') && !writer.includes('search'));
 });

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -85,4 +86,28 @@ test('an MCP client over stdio shares the same library as the CLI', async () => 
   const [task] = json(home, ['task', 'list', '-p', 'garage']);
   assert.equal(task.title, 'Build Security+ 2.0 bench simulator');
   assert.equal(task.source, 'mcp:claude-code');
+});
+
+test('serve exposes the library over HTTP to token holders', async () => {
+  const home = tempHome();
+  const { token, client } = json(home, ['clients', 'add', 'Phone', '--scope', 'read,capture']);
+  assert.deepEqual(client.scopes, ['read', 'capture']);
+  assert.match(cli(home, ['clients', 'list']).stdout, /Phone {2}\(read, capture\) {2}em_/);
+
+  const server = spawn(process.execPath, [MAIN, '--home', home, 'serve', '--port', '0']);
+  try {
+    let log = '';
+    server.stderr.setEncoding('utf8');
+    while (!/listening on (\S+)/.test(log)) log += (await once(server.stderr, 'data'))[0];
+    const base = /listening on (\S+)/.exec(log)![1]!;
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const saved = await fetch(`${base}/api/v1/capture`, { method: 'POST', headers, body: JSON.stringify({ selection: 'from the phone' }) });
+    assert.equal(saved.status, 201);
+    const hits = (await (await fetch(`${base}/api/v1/search?q=phone`, { headers })).json()) as { snippet: string }[];
+    assert.equal(hits[0]?.snippet, '> from the [phone]');
+  } finally {
+    server.kill('SIGTERM');
+    await once(server, 'exit');
+  }
+  assert.equal(json(home, ['list'])[0].source, 'api:Phone');
 });

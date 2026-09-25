@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { type ParseArgsConfig, parseArgs } from 'node:util';
 import { EnveMemory, MemoryError } from '@enve-memory/core';
+import { DEFAULT_PORT, createApiServer } from '@enve-memory/api';
 import { SERVER_NAME, serveMemoryOverStdio } from '@enve-memory/mcp';
 import pkg from '../package.json' with { type: 'json' };
 import * as format from './format.ts';
@@ -40,9 +41,13 @@ Organize
   archive <id> / unarchive <id>
   delete <id> --yes            Permanently delete
 
-AI clients
+AI clients and devices
   mcp                          Run the MCP server on stdio
   connect                      Print setup for Claude Code, Codex and other MCP clients
+  serve                        Run the local HTTP API + MCP-over-HTTP  [--port 49231] [--lan]
+  clients add <name>           Create an API token   --scope read|capture|write (repeat or comma-separate)
+  clients list                 List API clients
+  clients revoke <id>          Revoke a token immediately
 
 Other
   info                         Library location and stats
@@ -78,6 +83,9 @@ const { values: opts, positionals } = parseCommandLine({
     reason: { type: 'string' },
     supersedes: { type: 'string', multiple: true },
     set: { type: 'string' },
+    scope: { type: 'string', multiple: true },
+    port: { type: 'string' },
+    lan: { type: 'boolean' },
     limit: { type: 'string' },
     all: { type: 'boolean' },
     yes: { type: 'boolean' },
@@ -175,6 +183,8 @@ function run(memory: EnveMemory): void {
       const changes = memory.activity.recent({ project: opts.project }, limit());
       return emit(changes, changes.map(format.changeLine).join('\n') || 'No activity yet.');
     }
+    case 'clients':
+      return runClients(memory);
     case 'task':
       return runTask(memory);
     case 'project':
@@ -193,6 +203,43 @@ function run(memory: EnveMemory): void {
     default:
       throw new UsageError(`Unknown command "${command}".`);
   }
+}
+
+function runClients(memory: EnveMemory): void {
+  const [sub] = rest;
+  switch (sub) {
+    case 'add': {
+      const scopes = (opts.scope ?? []).flatMap((s) => s.split(',')).map((s) => s.trim()).filter(Boolean);
+      const { client, token } = memory.clients.create(text(1, 'name'), scopes);
+      return emit({ client, token }, `Created ${client.name} (${client.scopes.join(', ')})\n\n  ${token}\n\nThis token is shown once. Store it in the client now.`);
+    }
+    case 'list': {
+      const clients = memory.clients.list();
+      return emit(clients, clients.map(format.clientLine).join('\n') || 'No API clients.');
+    }
+    case 'revoke': {
+      const client = memory.clients.revoke(arg(1, 'id'));
+      return emit(client, `Revoked ${client.name}`);
+    }
+    default:
+      throw new UsageError('Usage: clients add|list|revoke');
+  }
+}
+
+async function serve(): Promise<void> {
+  const memory = EnveMemory.open({ home: opts.home, actor: 'api' });
+  const port = opts.port === undefined ? DEFAULT_PORT : Number(opts.port);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new UsageError(`Invalid port "${opts.port}".`);
+  const api = createApiServer(memory, { version: pkg.version, port, lan: opts.lan });
+  const url = await api.listen();
+  console.error(`Enve Memory API listening on ${url}${opts.lan ? ' (also reachable from your network)' : ''}\nREST: ${url}/api/v1   MCP: ${url}/mcp`);
+  const stop = async () => {
+    await api.close();
+    memory.close();
+    process.exit(0);
+  };
+  process.once('SIGINT', stop);
+  process.once('SIGTERM', stop);
 }
 
 function runTask(memory: EnveMemory): void {
@@ -275,7 +322,12 @@ Codex (~/.codex/config.toml):
   args = ${JSON.stringify(args)}
 
 Claude Desktop, Cursor and other JSON-configured clients:
-  ${JSON.stringify({ mcpServers: { [SERVER_NAME]: { command: node, args } } })}`;
+  ${JSON.stringify({ mcpServers: { [SERVER_NAME]: { command: node, args } } })}
+
+Clients that connect over HTTP (remote agents, other machines):
+  1. enve-memory serve            (the desktop app runs this for you)
+  2. enve-memory clients add "My agent" --scope read,write
+  3. Point the client at http://127.0.0.1:${DEFAULT_PORT}/mcp with header  Authorization: Bearer <token>`;
 }
 
 function main(): number {
@@ -289,6 +341,10 @@ function main(): number {
   }
   if (command === 'connect') {
     console.log(connectInstructions());
+    return 0;
+  }
+  if (command === 'serve') {
+    void serve().catch(fail);
     return 0;
   }
   if (command === 'mcp') {
@@ -306,16 +362,23 @@ function main(): number {
   }
 }
 
-try {
-  process.exitCode = main();
-} catch (error) {
+function fail(error: unknown): void {
   if (error instanceof UsageError) {
     console.error(`${error.message}\nRun \`enve-memory --help\` for usage.`);
     process.exitCode = 2;
   } else if (error instanceof MemoryError) {
     console.error(`error: ${error.message}`);
     process.exitCode = 1;
+  } else if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+    console.error('error: that port is already in use. Is Enve Memory already running? Use --port to pick another.');
+    process.exitCode = 1;
   } else {
     throw error;
   }
+}
+
+try {
+  process.exitCode = main();
+} catch (error) {
+  fail(error);
 }

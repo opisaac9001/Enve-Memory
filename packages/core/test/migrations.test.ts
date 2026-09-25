@@ -93,3 +93,24 @@ test('the search index survives VACUUM after deletes', () => {
   assert.deepEqual(reopened.search.query('beta').map((h) => h.id), [kept.id]);
   reopened.close();
 });
+
+test('a populated v1 library upgrades to the latest schema without losing anything', () => {
+  const home = tempHome();
+  const file = join(home, 'memory.sqlite');
+  const v1 = openDatabase(file, { migrations: MIGRATIONS.slice(0, 1) });
+  const now = new Date().toISOString();
+  v1.prepare(`INSERT INTO projects (id, name, slug, memory, created_at, updated_at) VALUES ('p1', 'Garage', 'garage', 'Goal: offline', ?, ?)`).run(now, now);
+  v1.prepare(`INSERT INTO items (id, type, title, body, project_id, source, created_at, updated_at) VALUES ('i1', 'note', 'Relay wiring', 'Use the NO contact', 'p1', 'cli', ?, ?)`).run(now, now);
+  v1.prepare(`INSERT INTO items (id, type, title, project_id, source, created_at, updated_at) VALUES ('t1', 'task', 'Order relays', 'p1', 'cli', ?, ?)`).run(now, now);
+  v1.prepare(`INSERT INTO tasks (item_id, due_at) VALUES ('t1', '2026-10-01')`).run();
+  v1.close();
+
+  const memory = EnveMemory.open({ home, actor: 'test' });
+  assert.equal(memory.schemaVersion, MIGRATIONS.length);
+  assert.equal(memory.projects.resolve('garage').memory, 'Goal: offline');
+  assert.deepEqual(memory.search.query('contact').map((h) => h.id), ['i1']);
+  assert.equal(memory.tasks.get('t1').task.dueAt, '2026-10-01');
+  assert.deepEqual(memory.briefing('garage').openTasks.map((t) => t.id), ['t1']);
+  memory.close();
+  assert.equal(readdirSync(join(home, 'backups')).length, 1);
+});

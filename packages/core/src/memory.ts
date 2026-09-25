@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { ActivityService } from './activity.ts';
+import { ClientService } from './clients.ts';
 import { Context } from './context.ts';
 import { IN_MEMORY, openDatabase, schemaVersion } from './db.ts';
 import { DecisionService } from './decisions.ts';
@@ -28,6 +29,7 @@ export class EnveMemory {
   readonly decisions: DecisionService;
   readonly search: SearchService;
   readonly activity: ActivityService;
+  readonly clients: ClientService;
   private readonly db: DatabaseSync;
   private readonly ctx: Context;
 
@@ -47,6 +49,7 @@ export class EnveMemory {
     this.decisions = new DecisionService(this.ctx, this.items, this.projects);
     this.search = new SearchService(this.ctx, this.items);
     this.activity = new ActivityService(this.ctx, this.projects);
+    this.clients = new ClientService(this.ctx);
   }
 
   get actor(): string {

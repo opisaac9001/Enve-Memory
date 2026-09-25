@@ -110,4 +110,20 @@ export const MIGRATIONS: readonly Migration[] = [
       END;
     `,
   },
+  {
+    name: 'api_clients',
+    sql: `
+      -- Local HTTP/MCP clients. Only a SHA-256 of each token is stored. Not user content, so not in the change log.
+      CREATE TABLE api_clients (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        token_hint TEXT NOT NULL,
+        scopes TEXT NOT NULL CHECK (json_valid(scopes)),
+        created_at TEXT NOT NULL,
+        last_used_at TEXT,
+        revoked_at TEXT
+      ) STRICT;
+    `,
+  },
 ];

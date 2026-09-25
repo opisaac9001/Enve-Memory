@@ -22,15 +22,16 @@
 |---|---|
 | `packages/core` | Schema and migrations, services (projects, items, tasks, decisions, search, activity), and the `EnveMemory` facade. No dependencies. |
 | `packages/mcp` | MCP tool definitions over core, using the official TypeScript SDK v2 (`@modelcontextprotocol/server`, spec 2026-07-28). Thin: argument shaping and output trimming only. |
-| `packages/cli` | The `enve-memory` binary: human and `--json` commands, `mcp` (stdio server) and `connect` (client setup snippets). |
+| `packages/api` | Local HTTP server: REST (`/api/v1`) + MCP over Streamable HTTP (`/mcp`), with token auth, scopes and Host/Origin guards. |
+| `packages/cli` | The `enve-memory` binary: human and `--json` commands, `mcp` (stdio), `serve` (HTTP), `clients` (tokens) and `connect` (client setup snippets). |
 
-Planned: `packages/api` (local HTTP API; MCP over Streamable HTTP), `packages/ingestion` (URL/PDF/image extractors), `packages/embeddings` (vector index abstraction), `packages/ai` (provider interface), `apps/desktop`, `apps/extension`, and an `apps/ios` SwiftUI companion.
+Planned: `packages/ingestion` (URL/PDF/image extractors), `packages/embeddings` (vector index abstraction), `packages/ai` (provider interface), `apps/desktop`, `apps/extension`, and an `apps/ios` SwiftUI companion.
 
 ## Stack decisions
 
 | Decision | Why |
 |---|---|
-| TypeScript on Node ≥ 26 | One codebase for macOS, Windows and Linux. The MCP SDK, parsers and browser tooling are all native to it. |
+| TypeScript on Node ≥ 24 (Electron 44 ships Node 24.21) | One codebase for macOS, Windows and Linux. The MCP SDK, parsers and browser tooling are all native to it. |
 | `node:sqlite`, not better-sqlite3 | Built into Node, so there are no native modules to compile per OS or per Electron ABI. Supports FTS5 and loadable extensions (`allowExtension`), which sqlite-vec will need. |
 | Node's built-in TypeScript type stripping | No build step in development. Code must stay within erasable syntax (`erasableSyntaxOnly`): no enums, namespaces or parameter properties. |
 | npm workspaces | Ships with Node, so there's nothing extra to install. |

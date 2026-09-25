@@ -1,5 +1,5 @@
 import {
-  EnveMemory, ITEM_TYPES, type Item, PROJECT_STATUSES, type Project, RELATION_KINDS, TASK_PRIORITIES, TASK_STATUSES, type Task,
+  CLIENT_SCOPES, type ClientScope, EnveMemory, ITEM_TYPES, type Item, PROJECT_STATUSES, type Project, RELATION_KINDS, TASK_PRIORITIES, TASK_STATUSES, type Task,
 } from '@enve-memory/core';
 import {
   CLIENT_INFO_META_KEY, type Implementation, McpServer, type ServerContext, type StandardSchemaWithJSON, type ToolAnnotations,
@@ -50,7 +50,18 @@ const projectSummary = (p: Project) => ({
 
 const reply = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
 
-export function createServer(memory: EnveMemory, version: string): McpServer {
+export interface ServerAccess {
+  scopes: readonly ClientScope[];
+  /** Used for attribution when the MCP client doesn't identify itself. */
+  clientName?: string;
+}
+
+const FULL_ACCESS: ServerAccess = { scopes: CLIENT_SCOPES };
+
+const allows = (granted: readonly ClientScope[], needed: ClientScope) =>
+  granted.includes(needed) || (needed === 'capture' && granted.includes('write'));
+
+export function createServer(memory: EnveMemory, version: string, access: ServerAccess = FULL_ACCESS): McpServer {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const server = new McpServer(
     { name: SERVER_NAME, version },
@@ -59,16 +70,19 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
 
   const tool = <S extends z.ZodObject>(
     name: string,
+    scope: ClientScope,
     config: { title: string; description: string; inputSchema: S; annotations: ToolAnnotations },
     run: (args: z.infer<S>) => unknown,
-  ) =>
+  ) => {
+    if (!allows(access.scopes, scope)) return;
     // The SDK's callback type is a conditional on S that TypeScript cannot resolve for a generic S.
     server.registerTool<StandardSchemaWithJSON, S>(name, config, (async (args: z.infer<S>, ctx: ServerContext) => {
-      memory.actor = `mcp:${clientName(server, ctx)}`;
+      memory.actor = `mcp:${clientName(server, ctx) ?? access.clientName ?? 'unknown'}`;
       return reply(run(args));
     }) as unknown as ToolCallback<S>);
+  };
 
-  tool('search', {
+  tool('search', 'read', {
     title: 'Search memory',
     description: 'Full-text search across everything saved: notes, links, tasks and decisions. Returns ranked hits with a highlighted snippet; use get_item for full text.',
     inputSchema: z.object({
@@ -82,14 +96,14 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     annotations: READ,
   }, (a) => memory.search.query(a.query, { project: a.project, type: a.type, tag: a.tag, includeArchived: a.include_archived }, a.limit));
 
-  tool('get_item', {
+  tool('get_item', 'read', {
     title: 'Get item',
     description: 'Full content of one item, with its tags, task fields and related items.',
     inputSchema: z.object({ id: itemId }),
     annotations: READ,
   }, (a) => memory.items.get(a.id));
 
-  tool('list_items', {
+  tool('list_items', 'read', {
     title: 'List items',
     description: 'Most recently updated items, optionally filtered by project, type or tag.',
     inputSchema: z.object({
@@ -101,7 +115,7 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     annotations: READ,
   }, (a) => memory.items.list({ project: a.project, type: a.type, tag: a.tag }, a.limit).map(summary));
 
-  tool('save_note', {
+  tool('save_note', 'capture', {
     title: 'Save note',
     description: 'Save a note: a fact, finding, summary or anything worth remembering.',
     inputSchema: z.object({
@@ -113,9 +127,9 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     annotations: WRITE,
   }, (a) => memory.items.saveNote({ body: a.text, title: a.title, project: a.project, tags: a.tags }));
 
-  tool('save_link', {
+  tool('save_link', 'capture', {
     title: 'Save link',
-    description: 'Bookmark a URL with an optional note. Saving a URL that is already bookmarked returns the existing bookmark (created: false) and adds any new tags.',
+    description: 'Bookmark a URL with an optional note. Saving a URL that is already bookmarked returns the existing bookmark (created: false), appending the note and adding any new tags.',
     inputSchema: z.object({
       url: z.string(),
       title: z.string().optional(),
@@ -126,7 +140,7 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     annotations: WRITE,
   }, (a) => memory.items.saveLink({ url: a.url, title: a.title, note: a.note, project: a.project, tags: a.tags }));
 
-  tool('update_item', {
+  tool('update_item', 'write', {
     title: 'Update item',
     description: 'Edit a note, link or task\'s title, body/note text, URL or project. Pass project: null to remove it from its project. Decisions cannot be edited.',
     inputSchema: z.object({
@@ -139,35 +153,35 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     annotations: WRITE,
   }, (a) => memory.items.update(a.id, { title: a.title, body: a.body, url: a.url, project: a.project }));
 
-  tool('archive_item', {
+  tool('archive_item', 'write', {
     title: 'Archive item',
     description: 'Hide an item from lists and search. Reversible by the user; nothing is deleted.',
     inputSchema: z.object({ id: itemId }),
     annotations: { ...WRITE, idempotentHint: true },
   }, (a) => summary(memory.items.archive(a.id)));
 
-  tool('tag_item', {
+  tool('tag_item', 'write', {
     title: 'Tag item',
     description: 'Add and/or remove tags on an item.',
     inputSchema: z.object({ id: itemId, add: tags.optional(), remove: tags.optional() }),
     annotations: { ...WRITE, idempotentHint: true },
   }, (a) => ({ id: a.id, tags: memory.items.tag(a.id, { add: a.add, remove: a.remove }).tags }));
 
-  tool('relate_items', {
+  tool('relate_items', 'write', {
     title: 'Relate items',
     description: 'Record that one item relates to another, e.g. a note derived_from a link, or a task that depends_on another.',
     inputSchema: z.object({ from: itemId, to: itemId, kind: z.enum(RELATION_KINDS.filter((k) => k !== 'supersedes')) }),
     annotations: { ...WRITE, idempotentHint: true },
   }, (a) => ({ id: a.from, relations: memory.items.relate(a.from, a.to, a.kind).relations }));
 
-  tool('list_projects', {
+  tool('list_projects', 'read', {
     title: 'List projects',
     description: 'All projects. Archived projects are hidden unless status is "archived".',
     inputSchema: z.object({ status: z.enum(PROJECT_STATUSES).optional() }),
     annotations: READ,
   }, (a) => memory.projects.list(a.status).map(projectSummary));
 
-  tool('get_project', {
+  tool('get_project', 'read', {
     title: 'Get project briefing',
     description: 'Everything needed to pick up a project: description, standing instructions, memory document, decision log, open tasks and recent notes and links.',
     inputSchema: z.object({ project }),
@@ -177,7 +191,7 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     return { ...briefing, openTasks: briefing.openTasks.map(summary), recentItems: briefing.recentItems.map(summary) };
   });
 
-  tool('create_project', {
+  tool('create_project', 'write', {
     title: 'Create project',
     description: 'Create a project to group related notes, links, tasks and decisions.',
     inputSchema: z.object({
@@ -188,7 +202,7 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     annotations: WRITE,
   }, (a) => projectSummary(memory.projects.create(a)));
 
-  tool('update_project', {
+  tool('update_project', 'write', {
     title: 'Update project',
     description: 'Rename a project or change its description, instructions or status.',
     inputSchema: z.object({
@@ -201,14 +215,14 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     annotations: WRITE,
   }, (a) => projectSummary(memory.projects.update(a.project, a)));
 
-  tool('set_project_memory', {
+  tool('set_project_memory', 'write', {
     title: 'Set project memory',
     description: 'Replace the project\'s memory document: the living summary of goals, constraints, current state and open questions. Send the complete text; earlier versions are kept in history.',
     inputSchema: z.object({ project, memory: z.string().describe('Complete Markdown document') }),
     annotations: { ...WRITE, idempotentHint: true },
   }, (a) => ({ project: memory.projects.setMemory(a.project, a.memory).name, saved: true }));
 
-  tool('record_decision', {
+  tool('record_decision', 'write', {
     title: 'Record decision',
     description: 'Append a decision to the project\'s decision log. To change an earlier decision, pass its id in supersedes; the old one is kept and marked superseded.',
     inputSchema: z.object({
@@ -220,7 +234,7 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     annotations: WRITE,
   }, (a) => memory.decisions.record(a));
 
-  tool('create_task', {
+  tool('create_task', 'capture', {
     title: 'Create task',
     description: 'Add a task.',
     inputSchema: z.object({
@@ -234,7 +248,7 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     annotations: WRITE,
   }, (a) => summary(memory.tasks.create(a)));
 
-  tool('update_task', {
+  tool('update_task', 'write', {
     title: 'Update task',
     description: 'Change a task\'s title, notes, status, due date, priority or project. Pass due: null to clear the due date.',
     inputSchema: z.object({
@@ -249,14 +263,14 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     annotations: WRITE,
   }, (a) => summary(memory.tasks.update(a.id, a)));
 
-  tool('complete_task', {
+  tool('complete_task', 'write', {
     title: 'Complete task',
     description: 'Mark a task done.',
     inputSchema: z.object({ id: itemId }),
     annotations: { ...WRITE, idempotentHint: true },
   }, (a) => summary(memory.tasks.complete(a.id)));
 
-  tool('list_tasks', {
+  tool('list_tasks', 'read', {
     title: 'List tasks',
     description: 'Tasks ordered by due date then priority. status "active" (default) means open or in progress.',
     inputSchema: z.object({
@@ -268,7 +282,7 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
     annotations: READ,
   }, (a) => memory.tasks.list({ project: a.project, status: a.status, tag: a.tag }, a.limit).map(summary));
 
-  tool('get_recent_activity', {
+  tool('get_recent_activity', 'read', {
     title: 'Recent activity',
     description: 'What changed recently and which client made each change, newest first.',
     inputSchema: z.object({ project: project.optional(), limit: limit.optional().describe('Default 50') }),
@@ -288,7 +302,7 @@ export function createServer(memory: EnveMemory, version: string): McpServer {
   return server;
 }
 
-function clientName(server: McpServer, ctx: ServerContext): string {
+function clientName(server: McpServer, ctx: ServerContext): string | undefined {
   const perRequest = ctx.mcpReq._meta?.[CLIENT_INFO_META_KEY] as Implementation | undefined;
-  return perRequest?.name ?? server.server.getClientVersion()?.name ?? 'unknown';
+  return perRequest?.name ?? server.server.getClientVersion()?.name;
 }

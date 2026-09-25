@@ -8,7 +8,7 @@ Save links, notes, tasks and decisions once. Find them yourself, or let Claude, 
 
 ## Try it
 
-Requires Node 26+.
+Requires Node 24+.
 
 ```bash
 npm install

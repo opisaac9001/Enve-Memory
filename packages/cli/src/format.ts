@@ -1,4 +1,4 @@
-import type { Change, Decision, Item, ItemDetail, Project, ProjectBriefing, SearchHit, Task } from '@enve-memory/core';
+import type { ApiClient, Change, Decision, Item, ItemDetail, Project, ProjectBriefing, SearchHit, Task } from '@enve-memory/core';
 
 const oneLine = (text: string, max = 80) => {
   const flat = text.replace(/\s+/g, ' ').trim();
@@ -75,4 +75,9 @@ export function changeLine(change: Change): string {
   const data = change.data ?? {};
   const subject = ['title', 'name', 'body', 'type'].map((k) => data[k]).find((v) => typeof v === 'string' && v) as string | undefined;
   return `${change.at}  ${change.actor}  ${change.op} ${change.entity}${subject ? `: ${oneLine(subject, 60)}` : ''}\n    ${change.entityId}`;
+}
+
+export function clientLine(client: ApiClient): string {
+  const state = client.revokedAt ? '  [revoked]' : client.lastUsedAt ? `  last used ${client.lastUsedAt}` : '  never used';
+  return `${client.name}  (${client.scopes.join(', ')})  ${client.tokenHint}${state}\n    ${client.id}`;
 }

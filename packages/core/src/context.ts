@@ -1,10 +1,18 @@
-import { randomUUIDv7 } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import type { DatabaseSync, SQLInputValue, StatementSync } from 'node:sqlite';
 import { transaction } from './db.ts';
 import { invalid } from './errors.ts';
 import type { Change, Item, ItemType, TaskFields, TaskPriority, TaskStatus } from './types.ts';
 
-export const newId = (): string => randomUUIDv7();
+/** RFC 9562 UUIDv7: 48-bit millisecond timestamp, then random bits. Node 24 (Electron's runtime) lacks crypto.randomUUIDv7. */
+export function newId(): string {
+  const bytes = randomBytes(16);
+  bytes.writeUIntBE(Date.now(), 0, 6);
+  bytes[6] = (bytes[6]! & 0x0f) | 0x70;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 export class Context {
   readonly db: DatabaseSync;

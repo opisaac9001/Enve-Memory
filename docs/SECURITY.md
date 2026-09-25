@@ -2,20 +2,30 @@
 
 We are giving AI agents read/write access to a person's memory. The threat model has three parts: other software on the machine or network, websites in the user's browser, and content the user saved that tries to steer an agent.
 
-## Today (stdio only)
+## Stdio MCP
 
-- **No network listener.** MCP runs over stdio, launched by the client the user configured. Whoever can spawn the process already has the user's file access, so stdio needs no tokens.
-- **The database is an ordinary user-owned file** in the platform data folder. It is protected by OS file permissions and, where the user has it, full-disk encryption.
-- **No destructive MCP tools**, the append-only decision log, and history for every write. See [MCP.md](MCP.md#prompt-injection).
+- **No network listener.** The AI client the user configured launches `enve-memory mcp` over stdio. Anything that can spawn that process already has the user's file access, so stdio needs no token and exposes every tool.
+- **The database is an ordinary file owned by the user**, in the platform data folder. It is protected by OS file permissions and, where enabled, full-disk encryption.
+- **No destructive MCP tools**, the decision log is append-only, and every write has history. See [MCP.md](MCP.md#prompt-injection).
 
-## HTTP API and MCP-over-HTTP (Phase 2): requirements
+## Local HTTP API and MCP over HTTP (`packages/api`)
 
-1. **Bind `127.0.0.1` only** by default, never `0.0.0.0`. LAN or Tailscale access is an explicit opt-in.
-2. **Reject DNS rebinding and browser CSRF.** Any website can make the user's browser send requests to `127.0.0.1`. Validate `Host` against the loopback allowlist and `Origin` against an allowlist (the extension's origin, no origin for native clients) on every request. Reject preflighted cross-origin requests from unknown origins. The SDK ships `validateHostHeader` / `validateOriginHeader` / `localhostAllowedHostnames` for this.
-3. **A bearer token per client** (`em_…`, 256-bit random). The server stores only a SHA-256 hash of each token in `api_clients`, like a password, so the database never holds a usable credential. The user sees the plaintext once, when connecting the client.
-4. **Per-client scopes**: `search`, `read`, `write:capture` (save only), `write` (edit, tasks, memory, decisions), `admin`. Examples: the browser extension gets `write:capture`, and a third-party client can be search-only. The UI lists clients with last-used time, and revoking one is immediate.
-5. **Destructive operations are never granted to a token.** Delete, purge, restore-from-backup and settings changes happen in the desktop UI, or go through an MCP elicitation (`input_required`) that the user confirms.
-6. **Rate limiting and body size limits** on the local server.
+Started by `enve-memory serve` or by the desktop app. Implemented and tested in `packages/api/test/api.test.ts`:
+
+1. **Binds to `127.0.0.1` only.** `--lan` binds `0.0.0.0` for phones and Tailscale, and is always an explicit opt-in.
+2. **`Host` must be a loopback name** unless LAN mode is on. This blocks DNS-rebinding attacks.
+3. **`Origin`, when present, must be a browser extension** (`chrome-extension:`, `moz-extension:`, `safari-web-extension:`) or a loopback page. Requests from web pages get a 403, even ones that carry a valid token. CORS headers go only to allowed origins.
+4. **Every route except `GET /api/v1/status` needs a bearer token** (`em_` + 256 random bits). Only the token's SHA-256 is stored (`api_clients.token_hash`). The plaintext is shown once, when the client is created. Revocation takes effect on the next request.
+5. **Scopes:**
+   - `read`: search, view, briefings and activity.
+   - `capture`: create notes, links and tasks only. This is the browser extension's scope.
+   - `write`: every non-destructive change. It implies `capture`.
+   REST routes check the scope. MCP over HTTP registers only the tools the token's scopes allow, so a read-only agent never sees a write tool.
+6. **Nothing destructive is reachable over HTTP.** Hard delete, purge, restore and settings live in the CLI or the desktop UI.
+7. **Request bodies are capped** (JSON at 2 MB), and errors never echo stack traces.
+8. **Attribution:** REST writes are recorded as `api:<client name>`. MCP writes are recorded as `mcp:<clientInfo name>`, falling back to the token's client name for stateless 2025-era requests.
+
+On a LAN, traffic is plain HTTP unless the user puts it behind Tailscale (WireGuard-encrypted) or a TLS proxy. This matches the accepted-risk stance of the other Enve apps toward user-owned LAN servers, and the docs recommend Tailscale for anything beyond the home network.
 
 ## Secrets we hold (Phase 4)
 

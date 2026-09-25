@@ -13,6 +13,20 @@ export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 export const RELATION_KINDS = ['related_to', 'references', 'derived_from', 'depends_on', 'supersedes'] as const;
 export type RelationKind = (typeof RELATION_KINDS)[number];
 
+/** read: search and view. capture: create notes, links, tasks and files. write: every non-destructive change (implies capture). */
+export const CLIENT_SCOPES = ['read', 'capture', 'write'] as const;
+export type ClientScope = (typeof CLIENT_SCOPES)[number];
+
+export interface ApiClient {
+  id: string;
+  name: string;
+  tokenHint: string;
+  scopes: ClientScope[];
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
 export interface Project {
   id: string;
   name: string;

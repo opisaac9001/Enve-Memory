@@ -10,11 +10,14 @@ Run `enve-memory connect` to get copy-paste setup for Claude Code, Codex, and JS
 claude mcp add --scope user enve-memory -- node "/path/to/Enve Memory/packages/cli/src/main.ts" mcp
 ```
 
-Transport today is **stdio**: the client launches `enve-memory mcp` and talks over stdin/stdout. Several clients can run their own stdio server against the same library at once (SQLite WAL). Streamable HTTP on `127.0.0.1` arrives with the desktop app. Its security model is in [SECURITY.md](SECURITY.md).
+Two transports:
+
+- **stdio**: the client launches `enve-memory mcp`. It gets every tool and needs no token. Several clients can each run their own stdio server against the same library (SQLite WAL).
+- **Streamable HTTP** at `http://127.0.0.1:49231/mcp`: served by `enve-memory serve` or the desktop app. It needs a bearer token (`enve-memory clients add NAME --scope read,write`), and the tools offered follow that token's scopes. See [SECURITY.md](SECURITY.md).
 
 ## Tools
 
-| Tool | Kind | Purpose |
+| Tool | Scope | Purpose |
 |---|---|---|
 | `search` | read | Full-text search with project / type / tag filters; ranked hits with highlighted snippets |
 | `get_item` | read | Full item with tags, task fields and relations |
@@ -23,8 +26,8 @@ Transport today is **stdio**: the client launches `enve-memory mcp` and talks ov
 | `get_project` | read | **Briefing**: description, instructions, memory document, decision log, open tasks, recent notes/links |
 | `list_tasks` | read | Tasks by due date then priority; `active` = open or in progress |
 | `get_recent_activity` | read | Who changed what, newest first |
-| `save_note` | write | New note |
-| `save_link` | write | New bookmark; an already-saved URL returns the existing one (`created: false`) and merges tags |
+| `save_note` | capture | New note |
+| `save_link` | capture | New bookmark; an already-saved URL returns the existing one (`created: false`) and merges the note and tags |
 | `update_item` | write | Edit title / body / URL / project. Refuses decisions. |
 | `archive_item` | write | Hide from lists and search (reversible) |
 | `tag_item` | write | Add/remove tags |
@@ -32,9 +35,10 @@ Transport today is **stdio**: the client launches `enve-memory mcp` and talks ov
 | `create_project`, `update_project` | write | |
 | `set_project_memory` | write | Replace the memory document (history kept) |
 | `record_decision` | write | Append a decision, optionally superseding earlier ones |
-| `create_task`, `update_task`, `complete_task` | write | |
+| `create_task` | capture | |
+| `update_task`, `complete_task` | write | |
 
-No tool deletes anything, and every tool is annotated `destructiveHint: false`. Read tools are `readOnlyHint: true`.
+No tool deletes anything, and every tool is annotated `destructiveHint: false`. Read tools are `readOnlyHint: true`. The Scope column is what an HTTP token needs: `write` implies `capture`, and stdio has everything.
 
 ## Design rules
 

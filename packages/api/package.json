@@ -1,16 +1,15 @@
 {
-  "name": "@enve-memory/cli",
+  "name": "@enve-memory/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "bin": {
-    "enve-memory": "./src/main.ts"
-  },
+  "exports": "./src/index.ts",
   "dependencies": {
     "@enve-memory/core": "0.1.0",
     "@enve-memory/mcp": "0.1.0",
-    "@enve-memory/api": "0.1.0"
+    "@modelcontextprotocol/node": "^2.1.0",
+    "@modelcontextprotocol/server": "^2.1.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.1.0"

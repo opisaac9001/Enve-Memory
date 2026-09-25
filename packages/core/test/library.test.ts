@@ -71,14 +71,18 @@ test('notes and links are saved with project, tags, and the acting client', () =
   assert.equal(memory.activity.recent({ entityId: note.id }).at(-1)?.actor, 'mcp:claude-code');
 });
 
-test('saving an already-bookmarked URL returns the original and merges tags', () => {
+test('saving an already-bookmarked URL returns the original and merges notes and tags', () => {
   const memory = open();
   const first = memory.items.saveLink({ url: 'https://example.com/security-plus', title: 'Security+ 2.0' });
-  const again = memory.items.saveLink({ url: 'https://example.com/security-plus', tags: ['protocol'] });
+  const again = memory.items.saveLink({ url: 'https://example.com/security-plus', tags: ['protocol'], note: 'Rolling codes' });
   assert.equal(first.created, true);
   assert.equal(again.created, false);
   assert.equal(again.item.id, first.item.id);
   assert.deepEqual(again.item.tags, ['protocol']);
+  assert.equal(again.item.body, 'Rolling codes');
+  const third = memory.items.saveLink({ url: 'https://example.com/security-plus', note: 'Section 4' });
+  assert.equal(third.item.body, 'Rolling codes\n\nSection 4');
+  assert.equal(memory.items.saveLink({ url: 'https://example.com/security-plus', note: 'Section 4' }).item.body, third.item.body);
   assert.throws(() => memory.items.saveLink({ url: 'not a url' }), failsWith('invalid'));
 });
 
