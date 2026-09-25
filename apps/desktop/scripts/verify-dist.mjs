@@ -2,7 +2,8 @@
 //   node scripts/verify-dist.mjs ["/path/to/Enve Memory.app"]
 // 1. the bundled CLI runs under the app's own runtime (ELECTRON_RUN_AS_NODE) and serves MCP over stdio,
 // 2. the app starts, answers /api/v1/status on a free port, and quits cleanly,
-// 3. if the embedding model is already cached, the app's semantic indexer (onnxruntime-node) runs in the packaged app.
+// 3. keyword search works from the packaged CLI; if the embedding model is already cached and the build has the runtime,
+//    the app's semantic indexer (onnxruntime-node) runs in the packaged app. Intel builds must report semantic search off.
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
@@ -17,6 +18,16 @@ const app = resolve(process.argv[2] ?? join(root, 'release', 'mac-arm64', 'Enve 
 const executable = join(app, 'Contents', 'MacOS', 'Enve Memory');
 const cli = join(app, 'Contents', 'Resources', 'cli.mjs');
 const home = mkdtempSync(join(tmpdir(), 'enve-dist-'));
+// Intel builds ship without onnxruntime-node (it has no darwin-x64 binary); they must degrade to keyword search.
+const intel = execFileSync('lipo', ['-archs', executable], { encoding: 'utf8' }).trim() === 'x86_64';
+if (intel && process.arch === 'arm64') {
+  try {
+    execFileSync('arch', ['-x86_64', '/usr/bin/true'], { stdio: 'ignore' });
+  } catch {
+    console.error('This is an Intel build and Rosetta 2 is not installed, so it cannot run on this Mac.');
+    process.exit(1);
+  }
+}
 const cache = [join(root, '..', '..', '.cache'), join(homedir(), 'Library', 'Caches', 'Enve Memory')]
   .find((dir) => existsSync(join(dir, 'models', 'Xenova', 'all-MiniLM-L6-v2', 'onnx', 'model_quantized.onnx')));
 const env = { ...process.env, ENVE_MEMORY_HOME: home, ...(cache ? { ENVE_MEMORY_CACHE: cache } : {}) };
@@ -42,8 +53,8 @@ async function waitFor(check, what, timeoutMs = 30_000) {
 
 try {
   runCli('settings', 'fetchLinks', 'false');
-  runCli('settings', 'semanticSearch', cache ? 'true' : 'false');
-  console.log(`library ${home}; semantic search ${cache ? `on (model cache ${cache})` : 'off (no cached model)'}`);
+  runCli('settings', 'semanticSearch', cache || intel ? 'true' : 'false');
+  console.log(`library ${home}; ${intel ? 'Intel build' : 'Apple Silicon build'}; semantic search ${intel ? 'requested (must stay unavailable)' : cache ? `on (model cache ${cache})` : 'off (no cached model)'}`);
 
   const client = new Client({ name: 'dist-check', version: '1.0.0' });
   await client.connect(new StdioClientTransport({ command: executable, args: [cli, 'mcp'], env: nodeEnv, stderr: 'pipe' }));
@@ -67,7 +78,14 @@ try {
   assert.equal(status.name, 'enve-memory');
   console.log(`✔ packaged app: /api/v1/status on port ${port} → ${JSON.stringify(status)}`);
 
-  if (cache) {
+  const keyword = runCli('search', 'rolling', 'codes');
+  assert.ok(keyword.some((hit) => hit.snippet.includes('[rolling]')));
+  console.log(`✔ packaged CLI keyword search: ${keyword.length} hit`);
+
+  if (intel) {
+    assert.equal(runCli('info').semanticIndex, 'off');
+    console.log('✔ Intel build: semantic search reports itself unavailable; nothing tried to load onnxruntime');
+  } else if (cache) {
     const indexed = await waitFor(async () => {
       const { semanticIndex } = runCli('info');
       return /^[1-9]\d* indexed/.test(semanticIndex) && semanticIndex;

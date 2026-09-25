@@ -323,10 +323,19 @@ function SearchSection() {
   const total = (index.data?.indexed ?? 0) + pending;
   return (
     <Section title="Search" intro="Keyword search always works. Semantic search also matches meaning, using a small model that runs on this computer.">
-      <Row label="Semantic search" detail="Downloads a ~23 MB model once, then works offline. Nothing is sent anywhere.">
-        <Toggle label="Semantic search" checked={settings.data.semanticSearch} onChange={(on) => void set('semanticSearch', on)} />
-      </Row>
-      {settings.data.semanticSearch && index.data?.model && (
+      {index.data && !index.data.supported ? (
+        <Row
+          label="Semantic search"
+          detail={<span className="warning">Not available on this Mac. The local model’s runtime (onnxruntime) has no build for Intel Macs, so search matches words only. Everything else, including MCP search for your AI tools, works as usual.</span>}
+        >
+          <Toggle label="Semantic search" checked={false} disabled onChange={() => {}} />
+        </Row>
+      ) : (
+        <Row label="Semantic search" detail="Downloads a ~23 MB model once, then works offline. Nothing is sent anywhere.">
+          <Toggle label="Semantic search" checked={settings.data.semanticSearch} onChange={(on) => void set('semanticSearch', on)} />
+        </Row>
+      )}
+      {index.data?.enabled && index.data.model && (
         <div className="index-status">
           <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={index.data.indexed}>
             <span style={{ width: `${total ? (index.data.indexed / total) * 100 : 100}%` }} />

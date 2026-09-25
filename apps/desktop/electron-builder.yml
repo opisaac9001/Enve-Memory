@@ -13,8 +13,11 @@ files:
   - "!**/*.map"
   # transformers inlines onnxruntime-web for Node; only onnxruntime-node's binaries are loaded.
   - "!node_modules/onnxruntime-web/**"
-  # onnxruntime-node carries binaries for every OS; keep the one being packaged.
+  # onnxruntime-node carries binaries for every OS and CPU, and sharp's live in @img; keep only the target's.
+  # Where none exists (Intel Macs) nothing is shipped: the embedding runtime is imported lazily and semantic search reports itself unavailable.
   - "!node_modules/onnxruntime-node/bin/napi-v6/!(${platform})/**"
+  - "!node_modules/onnxruntime-node/bin/napi-v6/${platform}/!(${arch})/**"
+  - "!node_modules/@img/sharp-*${platform}-!(${arch})/**"
 extraResources:
   - from: resources/cli.mjs
     to: cli.mjs
@@ -27,15 +30,16 @@ npmRebuild: false
 mac:
   category: public.app-category.productivity
   target:
-    # onnxruntime-node 1.30 ships no darwin-x64 binary, so Intel Macs aren't a target yet.
+    # Separate dmgs: onnxruntime-node has no darwin-x64 binary, so the Intel build ships without it (keyword search only).
     - target: dmg
-      arch: [arm64]
+      arch: [arm64, x64]
   # Ad-hoc signature: no Apple Developer ID, but a valid seal, which Apple Silicon needs to launch the app at all.
   # For distribution, set CSC_NAME/CSC_LINK, enable hardenedRuntime and notarize.
   identity: '-'
   hardenedRuntime: false
 dmg:
   title: Enve Memory
+  artifactName: ${productName}-${version}-${arch}.${ext}
 win:
   target:
     - target: nsis

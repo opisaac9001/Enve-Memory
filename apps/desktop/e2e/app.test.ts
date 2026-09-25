@@ -562,6 +562,28 @@ describe('Enve Memory desktop', { timeout: 180_000 }, () => {
     await page.getByLabel('Project name').waitFor({ timeout: 2000 });
   });
 
+  test('Settings → Search explains when semantic search is unavailable (Intel Macs)', async () => {
+    // Stand in for an Intel Mac by answering index.status as the x64 build would; everything else passes through.
+    await app.evaluate(({ ipcMain }) => {
+      const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...a: unknown[]) => Promise<unknown>> })._invokeHandlers;
+      const original = handlers.get('enve:call')!;
+      handlers.set('enve:call', async (event: unknown, method: unknown, args: unknown) => {
+        const result = await original(event, method, args) as { ok: boolean; value: Record<string, unknown> };
+        return method === 'index.status' && result.ok ? { ok: true, value: { ...result.value, supported: false, enabled: false, model: null } } : result;
+      });
+      (globalThis as { restoreEnveCall?: () => void }).restoreEnveCall = () => handlers.set('enve:call', original);
+    });
+    await settings('Search');
+    await page.getByText('Not available on this Mac.', { exact: false }).waitFor();
+    assert.equal(await page.getByRole('switch', { name: 'Semantic search' }).isDisabled(), true);
+    assert.equal(await page.getByRole('switch', { name: 'Semantic search' }).getAttribute('aria-checked'), 'false');
+    await shot('settings-search-unavailable-dark');
+    await app.evaluate(() => (globalThis as { restoreEnveCall?: () => void }).restoreEnveCall!());
+    await settings('Library');
+    await settings('Search');
+    await page.getByText('Downloads a ~23 MB model once').waitFor();
+  });
+
   test('toggles the theme', async () => {
     await settings('Appearance');
     const dark = () => page.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches);

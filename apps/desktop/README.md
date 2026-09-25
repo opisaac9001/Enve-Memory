@@ -10,7 +10,7 @@ Electron + React on top of the workspace packages. The app opens the same SQLite
 | ![Archived page in the item drawer](docs/item-detail-dark.png) | ![Search palette](docs/search-dark.png) |
 | ![Settings → AI tools](docs/settings-ai-tools-dark.png) | ![Settings → Devices with pairing QR codes](docs/settings-devices-dark.png) |
 | ![Graph](docs/graph-dark.png) | ![Ask with citations](docs/ask-dark.png) |
-| ![Reminders with snooze](docs/reminders-dark.png) | |
+| ![Reminders with snooze](docs/reminders-dark.png) | ![Search settings on an Intel Mac](docs/settings-search-unavailable-dark.png) |
 | ![Home, light theme](docs/home-light.png) | ![Project, light theme](docs/project-light.png) |
 
 The screenshots are written by the E2E suite (`ask-dark.png` only when it runs against a real model, see below).
@@ -33,10 +33,10 @@ npm --prefix apps/desktop run dist:mac   # installer: release/Enve Memory-<versi
 
 - **What ships.** The asar holds `dist/` (main, preload, renderer, `cli.mjs`) plus the only runtime dependency, `@huggingface/transformers`, and its tree. Everything else is bundled by esbuild, so it's a devDependency. `onnxruntime-node`, `sharp` and `@img/*` are unpacked from the asar because they load native code; `onnxruntime-web` is left out (transformers inlines it for Node), and so are other operating systems' onnxruntime binaries. `npmRebuild` is off: every native module is an N-API prebuild.
 - **MCP from the installed app.** `Resources/cli.mjs` is a two-line entry point that imports the CLI inside the asar, so its imports resolve against the app's `node_modules`. AI clients run `ELECTRON_RUN_AS_NODE=1 "<app>/Contents/MacOS/Enve Memory" "<app>/Contents/Resources/cli.mjs" mcp`, which is exactly what Settings → AI tools shows for a packaged app.
-- **macOS.** Apple Silicon only for now: onnxruntime-node 1.30 has no darwin-x64 binary, and the app loads it at startup. The app is ad-hoc signed (`identity: '-'`), with no Developer ID and no notarization. On another Mac, open it the first time with right-click → Open. To distribute it, set `CSC_NAME`/`CSC_LINK`, turn on `hardenedRuntime` and notarize.
+- **macOS.** Two dmgs, `Enve Memory-<version>-arm64.dmg` and `…-x64.dmg`. onnxruntime-node has no darwin-x64 binary, so the Intel build ships without it and without sharp's native parts. The embedding runtime is only imported when semantic search first runs, and core turns semantic search off on Intel Macs (`localEmbeddingsSupported()`). The Intel app therefore starts normally, searches by keyword, and Settings → Search explains that semantic search isn't available there. Both apps are ad-hoc signed (`identity: '-'`), with no Developer ID and no notarization. On another Mac, open it the first time with right-click → Open. To distribute it, set `CSC_NAME`/`CSC_LINK`, turn on `hardenedRuntime` and notarize.
 - **Windows and Linux** are configured but not built here. Build them on their own OS (or in CI) so npm installs the matching `sharp`/`@img` binaries; a cross-build from a Mac would package the macOS ones.
 - **Icon.** `npm --prefix apps/desktop run icon` renders `build/icon.png` (and `build/icon.svg`) with sharp. electron-builder turns it into `.icns`/`.ico`.
-- **Checking a build.** `npm --prefix apps/desktop run verify:dist -- "/path/to/Enve Memory.app"` uses a throwaway library to connect the MCP SDK client to the packaged `cli.mjs` over stdio (initialize, list tools, save and search). It then starts the app on a free port and checks `/api/v1/status`. If the embedding model is already cached in `.cache/models` or `~/Library/Caches/Enve Memory/models`, it also waits for the packaged app to index with onnxruntime-node and runs a semantic search. Last, it quits the app and confirms the port is released.
+- **Checking a build.** `npm --prefix apps/desktop run verify:dist -- "/path/to/Enve Memory.app"` uses a throwaway library to connect the MCP SDK client to the packaged `cli.mjs` over stdio (initialize, list tools, save and search). It then starts the app on a free port, checks `/api/v1/status` and runs a keyword search from the packaged CLI. If the embedding model is already cached in `.cache/models` or `~/Library/Caches/Enve Memory/models`, it also waits for the packaged app to index with onnxruntime-node and runs a semantic search. Last, it quits the app and confirms the port is released.
 
 Environment:
 
@@ -104,4 +104,4 @@ The E2E suite uses a fresh temp library (`ENVE_MEMORY_HOME`), port `0`, semantic
 ## Not done yet
 
 - The global shortcut isn't configurable from the UI (it's `shortcut` in `desktop.json`).
-- No Intel Mac build (see Installers), no signed/notarized build, and no Windows or Linux build verified.
+- The Intel Mac build hasn't been run: the Mac it was built on has no Rosetta 2. `verify:dist` checks it on an Intel Mac or with Rosetta. No signed/notarized build, and no Windows or Linux build verified.

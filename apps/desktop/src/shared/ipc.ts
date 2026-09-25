@@ -53,6 +53,8 @@ export interface ApiStatus {
 }
 
 export interface IndexStatus {
+  /** The local embedding runtime exists for this OS and CPU (not on Intel Macs). */
+  supported: boolean;
   enabled: boolean;
   model: string | null;
   indexed: number;

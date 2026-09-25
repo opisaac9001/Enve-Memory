@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { AiError, PROVIDERS, type ProviderId, ask, createProvider, enrichItem, isProviderId } from '@enve-memory/ai';
 import { lanUrls, pairingLink } from '@enve-memory/api';
+import { localEmbeddingsSupported } from '@enve-memory/embeddings';
 import { type ItemFilter, MemoryError, pageCursor } from '@enve-memory/core';
 import { importBookmarks, importCsv, importEnveExport, importMarkdownFolder } from '@enve-memory/importers';
 import { ingestItem } from '@enve-memory/ingestion';
@@ -253,9 +254,10 @@ export function createHandlers(ctx: HandlerContext): Handlers {
     },
     'index.status': () => {
       const model = library.embedderModel;
-      const enabled = memory().settings.get('semanticSearch');
-      if (!model) return { enabled, model: null, indexed: 0, pending: 0, chunks: 0 };
-      return { enabled, model, ...memory().embeddings.status(model) };
+      const supported = localEmbeddingsSupported();
+      const enabled = supported && memory().settings.get('semanticSearch');
+      if (!model) return { supported, enabled, model: null, indexed: 0, pending: 0, chunks: 0 };
+      return { supported, enabled, model, ...memory().embeddings.status(model) };
     },
 
     'ai.status': aiStatus,
