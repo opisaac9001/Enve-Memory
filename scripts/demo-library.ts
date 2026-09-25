@@ -57,7 +57,9 @@ as('mcp:claude-code', () => memory.decisions.record({ project: 'home lab', decis
 
 // Links with archived text
 function link(input: { url: string; title: string; note?: string; project?: string; tags?: string[]; site: string; excerpt: string; text: string; ago: number; actor: string }) {
-  const { item } = as(input.actor, () => memory.items.saveLink({ url: input.url, title: input.title, note: input.note, project: input.project, tags: input.tags, ingest: false }));
+  const { item } = as(input.actor, () => memory.items.saveLink({
+    url: input.url, title: input.title, note: input.note, project: input.project, tags: input.tags, ingest: false, createdAt: days(input.ago),
+  }));
   memory.withActor('ingest', () => memory.items.setSource(item.id, {
     content: input.text,
     metadata: { siteName: input.site, excerpt: input.excerpt, wordCount: input.text.split(/\s+/).length, ingest: { status: 'done', at: days(input.ago) } },
@@ -112,19 +114,19 @@ link({
 });
 
 // Notes and a file
-as('mcp:claude-code', () => memory.items.saveNote({ project: 'garage', title: 'Wall console measurements', body: 'Measured the wall console: 12 V supply, and the data line idles high at 12 V. It needs a divider or level shifter before the ESP32 pin.', tags: ['measurements', 'wiring'] }));
-as('mcp:codex', () => memory.items.saveNote({ project: 'garage', title: 'Bench-test plan', body: 'Simulate the Security+ 2.0 rolling code on the bench rig first. Only move to the real opener once open, close, stop and light all work five times in a row.', tags: ['bench-rig'] }));
-as('desktop', () => memory.items.saveNote({ project: 'home lab', title: 'Upgrade runbook', body: '1. Snapshot the host.\n2. Upgrade Proxmox.\n3. Check the Plex LXC still sees /dev/dri.\n4. Run a restore test from the NAS.' }));
-as('api:iPhone', () => memory.items.saveNote({ body: 'Idea: a "door left open" notification after 10 minutes, but only at night.' }));
-memory.files.save({ data: new TextEncoder().encode('GPIO4  → console data (via shifter)\nGPIO5  → reed switch (pull-up)\nGPIO6  → light relay\n3V3/GND → shifter low side\n'), filename: 'pinout.txt', project: 'garage', tags: ['wiring'] });
+as('mcp:claude-code', () => memory.items.saveNote({ project: 'garage', createdAt: days(3), title: 'Wall console measurements', body: 'Measured the wall console: 12 V supply, and the data line idles high at 12 V. It needs a divider or level shifter before the ESP32 pin.', tags: ['measurements', 'wiring'] }));
+as('mcp:codex', () => memory.items.saveNote({ project: 'garage', createdAt: days(7), title: 'Bench-test plan', body: 'Simulate the Security+ 2.0 rolling code on the bench rig first. Only move to the real opener once open, close, stop and light all work five times in a row.', tags: ['bench-rig'] }));
+as('desktop', () => memory.items.saveNote({ project: 'home lab', createdAt: days(11), title: 'Upgrade runbook', body: '1. Snapshot the host.\n2. Upgrade Proxmox.\n3. Check the Plex LXC still sees /dev/dri.\n4. Run a restore test from the NAS.' }));
+as('api:iPhone', () => memory.items.saveNote({ createdAt: days(1), body: 'Idea: a "door left open" notification after 10 minutes, but only at night.' }));
+memory.files.save({ createdAt: days(8), data: new TextEncoder().encode('GPIO4  → console data (via shifter)\nGPIO5  → reed switch (pull-up)\nGPIO6  → light relay\n3V3/GND → shifter low side\n'), filename: 'pinout.txt', project: 'garage', tags: ['wiring'] });
 
 // Tasks
-const bench = as('mcp:claude-code', () => memory.tasks.create({ title: 'Build the Security+ 2.0 bench simulator', project: 'garage', priority: 'high', due: new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10) }));
-as('mcp:codex', () => memory.tasks.create({ title: 'Order a 4-channel level shifter', project: 'garage', due: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) }));
-as('desktop', () => memory.tasks.create({ title: 'Print the enclosure test fit', project: 'garage', priority: 'low' }));
-const restore = as('desktop', () => memory.tasks.create({ title: 'Run a restore test from the NAS', project: 'home lab' }));
+const bench = as('mcp:claude-code', () => memory.tasks.create({ createdAt: days(6), title: 'Build the Security+ 2.0 bench simulator', project: 'garage', priority: 'high', due: new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10) }));
+as('mcp:codex', () => memory.tasks.create({ createdAt: days(5), title: 'Order a 4-channel level shifter', project: 'garage', due: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) }));
+as('desktop', () => memory.tasks.create({ createdAt: days(3), title: 'Print the enclosure test fit', project: 'garage', priority: 'low' }));
+const restore = as('desktop', () => memory.tasks.create({ createdAt: days(13), title: 'Run a restore test from the NAS', project: 'home lab' }));
 memory.tasks.complete(restore.id);
-as('mcp:claude-code', () => memory.tasks.create({ title: 'Move Plex to hardware transcoding', project: 'home lab', priority: 'high' }));
+as('mcp:claude-code', () => memory.tasks.create({ createdAt: days(9), title: 'Move Plex to hardware transcoding', project: 'home lab', priority: 'high' }));
 
 // Relations, shelves, reminders and AI suggestions
 memory.items.relate(bench.id, secplus.id, 'references');
@@ -137,7 +139,7 @@ memory.items.suggest(essay.id, {
   summary: 'An argument for software that keeps your data in open formats so it outlives its makers.',
   tags: ['local-first', 'essay'], project: null,
 });
-const inbox = as('api:Chrome extension', () => memory.items.saveLink({ url: 'https://docs.example.org/home-assistant-covers', title: 'Home Assistant cover entities', ingest: false }).item);
+const inbox = as('api:Chrome extension', () => memory.items.saveLink({ url: 'https://docs.example.org/home-assistant-covers', title: 'Home Assistant cover entities', ingest: false, createdAt: new Date(Date.now() - 2 * 3_600_000).toISOString() }).item);
 memory.withActor('ingest', () => memory.items.setSource(inbox.id, {
   content: '# Home Assistant cover entities\n\nA cover is anything that opens and closes: garage doors, gates, blinds. It reports open, closed, opening or closing, and offers open, close and stop services. For a garage door opener, pair the cover with a separate door-position sensor such as a reed switch.',
   metadata: { siteName: 'Automation Handbook', excerpt: 'Covers model garage doors, gates and blinds with open, close and stop.', ingest: { status: 'done', at: days(0) } },

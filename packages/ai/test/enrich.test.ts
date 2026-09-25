@@ -141,3 +141,16 @@ test('with auto-apply on, suggestions are applied as they arrive', async () => {
   assert.equal(enriched.project?.name, 'Garage');
   assert.equal(enriched.metadata.ai?.accepted, true);
 });
+
+test('ask tells the model which decisions were replaced', async () => {
+  const memory = open();
+  memory.projects.create({ name: 'Garage' });
+  const old = memory.decisions.record({ project: 'garage', decision: 'Use an ESP32 controller' });
+  memory.decisions.record({ project: 'garage', decision: 'Switch to the ESP32-S3 controller', supersedes: [old.id] });
+  const provider = new FakeProvider(() => 'The ESP32-S3 [1].');
+  await ask(memory, provider, 'which controller did we decide on');
+  const prompt = provider.requests[0]!.prompt;
+  assert.match(prompt, /status="superseded" title="Use an ESP32 controller"/);
+  assert.match(prompt, /status="current" title="Switch to the ESP32-S3 controller"/);
+  assert.match(provider.requests[0]!.system, /superseded/);
+});

@@ -87,8 +87,9 @@ export class EmbeddingService {
   async indexPending(embedder: Embedder, limit = 50): Promise<number> {
     const ids = this.pending(embedder.model, limit);
     for (const id of ids) {
-      const row = this.ctx.get<{ title: string; body: string; content: string; updated_at: string }>(
-        `SELECT title, body, content, updated_at FROM items WHERE id = ?`, id,
+      const row = this.ctx.get<{ title: string; body: string; content: string; version: number | null }>(
+        `SELECT title, body, content, (SELECT max(seq) FROM changes WHERE entity = 'item' AND entity_id = items.id) AS version
+         FROM items WHERE id = ?`, id,
       );
       if (!row) continue;
       const chunks = chunkText([row.title, row.body, row.content].filter(Boolean).join('\n\n'));
@@ -97,9 +98,11 @@ export class EmbeddingService {
         vectors.push(...(await embedder.embed(chunks.slice(i, i + EMBED_BATCH), 'document')));
       }
       this.ctx.tx(() => {
-        // The item may have been edited while the model ran; the stale trigger would then have fired, so check again.
-        const current = this.ctx.get<{ updated_at: string }>(`SELECT updated_at FROM items WHERE id = ?`, id);
-        if (!current || current.updated_at !== row.updated_at) return;
+        // Any change to the item while the model ran (it has a change-log entry) means these vectors may be stale; the next pass redoes it.
+        const current = this.ctx.get<{ version: number | null }>(
+          `SELECT (SELECT max(seq) FROM changes WHERE entity = 'item' AND entity_id = items.id) AS version FROM items WHERE id = ?`, id,
+        );
+        if (!current || current.version !== row.version) return;
         this.ctx.run(`DELETE FROM chunks WHERE item_id = ? AND model = ?`, id, embedder.model);
         chunks.forEach((text, ordinal) => {
           this.ctx.run(

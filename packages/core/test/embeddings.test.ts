@@ -138,3 +138,30 @@ test('vectors written by another process are picked up; switching models prunes 
   reader.close();
   writer.close();
 });
+
+test('an item that changes while it is being embedded is indexed again', async () => {
+  const memory = EnveMemory.open({ inMemory: true, actor: 'test' });
+  const link = memory.items.saveLink({ url: 'https://example.com/page', title: 'Page', ingest: false }).item;
+  let first = true;
+  const racing: Embedder = {
+    model: 'test:racing',
+    async embed(texts) {
+      // The page's archived text lands while the model is still working on the title.
+      if (first) memory.items.setSource(link.id, { content: 'archived text arrives mid-embedding', metadata: {} });
+      first = false;
+      return texts.map(() => new Float32Array([1, 0]));
+    },
+  };
+  await memory.embeddings.indexPending(racing);
+  assert.deepEqual(memory.embeddings.pending(racing.model), [link.id], 'stale vectors are not kept');
+  await memory.embeddings.indexPending(racing);
+  assert.deepEqual(memory.embeddings.pending(racing.model), []);
+});
+
+test('archiving and AI suggestions do not move an item in "recently updated"', async () => {
+  const memory = EnveMemory.open({ inMemory: true, actor: 'test' });
+  const link = memory.items.saveLink({ url: 'https://example.com/a', ingest: false, createdAt: '2026-01-01T00:00:00.000Z' }).item;
+  memory.items.setSource(link.id, { content: 'text', metadata: {} });
+  memory.items.suggest(link.id, { status: 'done', at: new Date().toISOString(), model: 't', summary: 's', tags: [], project: null });
+  assert.equal(memory.items.get(link.id).updatedAt, '2026-01-01T00:00:00.000Z');
+});

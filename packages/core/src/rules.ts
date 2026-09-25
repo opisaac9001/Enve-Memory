@@ -115,9 +115,9 @@ export class RuleService {
       this.ctx.actor = `rule:${rule.name}`;
       try {
         const missing = (rule.actions.tags ?? []).filter((t) => !item.tags.includes(t));
-        if (missing.length) this.items.tag(item.id, { add: missing });
+        if (missing.length) this.items.tag(item.id, { add: missing }, false);
         if (!filed && rule.actions.project && this.ctx.get(`SELECT 1 FROM projects WHERE id = ?`, rule.actions.project)) {
-          this.items.update(item.id, { project: rule.actions.project });
+          this.items.update(item.id, { project: rule.actions.project }, false);
           filed = true;
         }
       } finally {

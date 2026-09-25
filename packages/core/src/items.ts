@@ -56,6 +56,8 @@ export interface SaveNoteInput {
   title?: string;
   project?: string;
   tags?: string[];
+  /** For imports and demos that recreate notes written earlier. */
+  createdAt?: string;
 }
 
 export interface SaveLinkInput {
@@ -107,7 +109,7 @@ export class ItemService {
 
   saveNote(input: SaveNoteInput): ItemDetail {
     const body = required(input.body, 'Note text');
-    return this.get(this.insert({ type: 'note', body, title: input.title, project: input.project, tags: input.tags }));
+    return this.get(this.insert({ type: 'note', body, title: input.title, project: input.project, tags: input.tags, createdAt: input.createdAt }));
   }
 
   /**
@@ -264,7 +266,8 @@ export class ItemService {
       const intent = detectIntent(row.url, update.metadata.ogType);
       if (intent !== row.intent) changes.intent = intent;
     }
-    this.write(row, changes, 'ingest', { ...changes, metadata: update.metadata });
+    // Archiving isn't an edit by the user, so it doesn't move the item in "recently updated".
+    this.write(row, changes, 'ingest', { ...changes, metadata: update.metadata }, false);
     this.afterSave?.(row.id);
     return this.get(row.id);
   }
@@ -273,7 +276,7 @@ export class ItemService {
   suggest(id: string, ai: AiSuggestions): ItemDetail {
     const row = this.row(id);
     const metadata = { ...(JSON.parse(row.metadata) as ItemMetadata), ai };
-    this.write(row, { metadata: JSON.stringify(metadata) }, 'enrich', { ai });
+    this.write(row, { metadata: JSON.stringify(metadata) }, 'enrich', { ai }, false);
     return this.get(row.id);
   }
 
@@ -356,7 +359,8 @@ export class ItemService {
     return items.map((item) => ({ ...item, tags: byItem.get(item.id) ?? [] }));
   }
 
-  update(id: string, input: UpdateItemInput): ItemDetail {
+  /** `touch: false` for automatic filing (rules, AI) that shouldn't count as the user editing the item. */
+  update(id: string, input: UpdateItemInput, touch = true): ItemDetail {
     const row = this.row(id);
     assertMutable(row);
     const changes: Record<string, SQLInputValue> = {};
@@ -367,7 +371,7 @@ export class ItemService {
       changes.project_id = input.project === null ? null : this.projects.resolve(input.project).id;
     }
     if (row.type === 'bookmark' && changes.url === null) throw invalid('A bookmark needs a URL.');
-    this.write(row, changes, 'update');
+    this.write(row, changes, 'update', changes, touch);
     return this.get(row.id);
   }
 
@@ -395,14 +399,14 @@ export class ItemService {
     for (const { sha256 } of blobs) removeBlobIfUnused(this.ctx, sha256);
   }
 
-  tag(id: string, { add = [], remove = [] }: { add?: string[]; remove?: string[] }): ItemDetail {
+  tag(id: string, { add = [], remove = [] }: { add?: string[]; remove?: string[] }, touch = true): ItemDetail {
     const row = this.row(id);
     const added = add.map(normalizeTag);
     const removed = remove.map(normalizeTag);
     if (added.length || removed.length) {
       this.ctx.tx(() => {
         this.applyTags(row.id, row.project_id, added, removed);
-        this.touch(row.id);
+        if (touch) this.touch(row.id);
       });
     }
     return this.get(row.id);
