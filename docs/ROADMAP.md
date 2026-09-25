@@ -12,7 +12,8 @@
 | 2b | Desktop shell (Electron vs Tauri decided here) with Home, Inbox, Library, Projects, Tasks, Search, Settings, Connected clients | |
 | 3 | Capture and understanding: URL ingestion (readable Markdown + metadata), browser extension (Chrome/Edge/Firefox/Safari), clipboard and drag-drop, PDFs and images as attachments, local embeddings, hybrid search | |
 | 4 | Optional AI enrichment through BYO providers: summaries, tag and project suggestions, relationship suggestions. "None" stays first-class | |
-| 5 | Backups (hourly/daily/monthly rotation), Export Everything (Markdown + JSON), installers for macOS/Windows/Linux | |
+| 5a | Backups (hourly/daily/monthly rotation, verified restore with undo, 30-day attachment trash), Export Everything (Markdown + JSON + files) | ✅ 2026-09-24 |
+| 5b | Installers for macOS/Windows/Linux | |
 | 6 | iOS companion: SwiftUI app + share extension, capture and search first | |
 | 7 | Sync (see SYNC.md) | |
 | 8 | Ecosystem: plugins (importers, exporters, extractors, providers, tools), automations, graph view, public sharing through a tunnel/relay, remote access via Tailscale | |

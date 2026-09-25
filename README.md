@@ -38,7 +38,7 @@ The server exposes 20 tools: search, briefings, notes, links, tasks, project mem
 | Windows | `%APPDATA%\Enve Memory\` |
 | Linux | `~/.config/Enve Memory/` |
 
-Override it with `--home DIR` or `ENVE_MEMORY_HOME`. Before any schema upgrade, a snapshot is written to `backups/`.
+Override it with `--home DIR` or `ENVE_MEMORY_HOME`. Snapshots are taken automatically (hourly, daily and monthly) while the app or `serve` runs, and before any schema upgrade. `enve-memory export <folder>` writes everything as Markdown, JSON and the original files.
 
 ## Docs
 

@@ -1,6 +1,6 @@
 export { EnveMemory, type OpenOptions } from './memory.ts';
 export { MemoryError, type MemoryErrorCode } from './errors.ts';
-export { defaultHome, pathsFor, type MemoryPaths } from './paths.ts';
+export { cacheDir, defaultHome, pathsFor, type MemoryPaths } from './paths.ts';
 export { migrate, openDatabase, schemaVersion, transaction } from './db.ts';
 export { MIGRATIONS, type Migration } from './migrations.ts';
 export { toFtsQuery } from './search.ts';
@@ -14,4 +14,6 @@ export type { CreateProjectInput, UpdateProjectInput } from './projects.ts';
 export type { RecordDecisionInput } from './decisions.ts';
 export type { Settings } from './settings.ts';
 export { DrainWorker } from './worker.ts';
+export { EXPORT_FORMAT, EXPORT_VERSION, type ExportSummary } from './export.ts';
+export { BACKUP_KINDS, type Backup, type BackupKind, listBackups, restoreBackup, verifyBackup } from './backups.ts';
 export * from './types.ts';

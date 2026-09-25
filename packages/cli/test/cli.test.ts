@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -56,6 +56,23 @@ test('files are saved from paths and can be read back', () => {
   assert.equal(json(home, ['link', 'https://example.com/never-fetched']).item.metadata.ingest, undefined);
 });
 
+test('export, snapshot and restore round-trip from the command line', () => {
+  const home = tempHome();
+  const note = json(home, ['note', 'before snapshot']);
+  const backup = json(home, ['backup']);
+  assert.equal(backup.kind, 'manual');
+  json(home, ['note', 'after snapshot']);
+
+  assert.equal(cli(home, ['restore', 'latest']).code, 2);
+  const restored = json(home, ['restore', 'latest', '--yes']);
+  assert.equal(restored.restored, backup.path);
+  assert.deepEqual(json(home, ['list']).map((i: { id: string }) => i.id), [note.id]);
+
+  const out = join(home, 'out');
+  assert.equal(json(home, ['export', out]).items, 1);
+  assert.match(readFileSync(join(out, 'README.md'), 'utf8'), /Enve Memory export/);
+});
+
 test('errors are reported with distinct exit codes', () => {
   const home = tempHome();
   assert.equal(cli(home, ['show', 'nope']).code, 1);
@@ -104,6 +121,7 @@ test('an MCP client over stdio shares the same library as the CLI', async () => 
 
 test('serve exposes the library over HTTP to token holders', async () => {
   const home = tempHome();
+  json(home, ['settings', 'semanticSearch', 'false']);
   const { token, client } = json(home, ['clients', 'add', 'Phone', '--scope', 'read,capture']);
   assert.deepEqual(client.scopes, ['read', 'capture']);
   assert.match(cli(home, ['clients', 'list']).stdout, /Phone {2}\(read, capture\) {2}em_/);

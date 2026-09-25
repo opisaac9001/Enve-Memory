@@ -2,10 +2,10 @@
 import { spawn } from 'node:child_process';
 import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type ParseArgsConfig, parseArgs } from 'node:util';
-import { EnveMemory, MemoryError, type Settings } from '@enve-memory/core';
+import { EnveMemory, MemoryError, type Settings, defaultHome, listBackups, pathsFor, restoreBackup } from '@enve-memory/core';
 import { attachLocalEmbedder, indexWorker } from '@enve-memory/embeddings';
 import { ingestItem, processPending } from '@enve-memory/ingestion';
 import { DEFAULT_PORT, createApiServer, lanUrls, pairingLink } from '@enve-memory/api';
@@ -56,6 +56,13 @@ AI clients and devices
   clients pair <device>        Create a read+write token for a phone and print its pairing link  [--port]
   clients list                 List API clients
   clients revoke <id>          Revoke a token immediately
+
+Your data
+  export <folder>              Write everything as Markdown + JSON (plus original files)
+  backup                       Take a snapshot now
+  backups                      List snapshots (taken automatically while the app or \`serve\` runs)
+  restore <file|latest> --yes  Replace the library with a snapshot; the current state is snapshotted first.
+                               Quit the desktop app, \`serve\` and AI clients first.
 
 Other
   ingest                       Fetch and extract anything still pending  [--retry] also retries failures
@@ -254,6 +261,18 @@ async function run(memory: EnveMemory): Promise<void> {
     }
     case 'clients':
       return runClients(memory);
+    case 'export': {
+      const summary = memory.exports.write(resolve(text(0, 'folder')));
+      return emit(summary, `Exported ${summary.items} items, ${summary.projects} projects and ${summary.files} files to ${summary.path}`);
+    }
+    case 'backup': {
+      const backup = memory.backups.create('manual');
+      return emit(backup, `Snapshot saved: ${backup.path}`);
+    }
+    case 'backups': {
+      const backups = memory.backups.list();
+      return emit(backups, backups.map((b) => `${b.createdAt}  ${b.kind.padEnd(13)} ${(b.size / 1024 / 1024).toFixed(1)} MB  ${b.file}`).join('\n') || 'No snapshots yet.');
+    }
     case 'task':
       return runTask(memory);
     case 'project':
@@ -320,8 +339,18 @@ async function serve(): Promise<void> {
   const url = await api.listen();
   api.ingest.kick();
   indexer?.kick();
+  const backup = () => {
+    try {
+      memory.backups.runSchedule();
+    } catch (error) {
+      console.error('backup:', error);
+    }
+  };
+  backup();
+  const backupTimer = setInterval(backup, 10 * 60_000);
   console.error(`Enve Memory API listening on ${url}${opts.lan ? ' (also reachable from your network)' : ''}\nREST: ${url}/api/v1   MCP: ${url}/mcp`);
   const stop = async () => {
+    clearInterval(backupTimer);
     await api.close();
     await indexer?.idle();
     memory.close();
@@ -434,6 +463,16 @@ async function main(): Promise<number> {
   }
   if (command === 'serve') {
     await serve();
+    return 0;
+  }
+  if (command === 'restore') {
+    const paths = pathsFor(opts.home ?? defaultHome());
+    const target = arg(0, 'file|latest');
+    const snapshot = target === 'latest' ? listBackups(paths.backups).find((b) => b.kind !== 'pre-restore')?.path : resolve(target);
+    if (!snapshot) throw new UsageError('There are no snapshots to restore.');
+    if (!opts.yes) throw new UsageError(`This replaces your library with ${snapshot}. Quit the desktop app, \`serve\` and AI clients, then re-run with --yes.`);
+    const { saved } = restoreBackup(paths, snapshot);
+    emit({ restored: snapshot, saved }, `Restored ${snapshot}.\nThe previous state was saved as ${saved}; restore that file to undo.`);
     return 0;
   }
   if (command === 'mcp') {

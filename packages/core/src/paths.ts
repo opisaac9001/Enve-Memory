@@ -6,6 +6,7 @@ export interface MemoryPaths {
   database: string;
   backups: string;
   attachments: string;
+  /** Shared by every library on the machine and safe to delete: models re-download on demand. */
   models: string;
 }
 
@@ -22,6 +23,25 @@ export function defaultHome(env: NodeJS.ProcessEnv = process.env, platform: Node
   }
 }
 
+/** Platform cache folder: not backed up, and the OS may clear it. */
+export function cacheDir(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string {
+  if (env.ENVE_MEMORY_CACHE) return env.ENVE_MEMORY_CACHE;
+  switch (platform) {
+    case 'darwin':
+      return join(homedir(), 'Library', 'Caches', 'Enve Memory');
+    case 'win32':
+      return join(env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'Enve Memory', 'Cache');
+    default:
+      return join(env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'enve-memory');
+  }
+}
+
 export function pathsFor(home: string): MemoryPaths {
-  return { home, database: join(home, 'memory.sqlite'), backups: join(home, 'backups'), attachments: join(home, 'attachments'), models: join(home, 'models') };
+  return {
+    home,
+    database: join(home, 'memory.sqlite'),
+    backups: join(home, 'backups'),
+    attachments: join(home, 'attachments'),
+    models: join(cacheDir(), 'models'),
+  };
 }

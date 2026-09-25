@@ -1,11 +1,13 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { ActivityService } from './activity.ts';
+import { BackupService } from './backups.ts';
 import { ClientService } from './clients.ts';
 import { FileService } from './files.ts';
 import { Context } from './context.ts';
 import { IN_MEMORY, openDatabase, schemaVersion } from './db.ts';
 import { DecisionService } from './decisions.ts';
 import { EmbeddingService } from './embeddings.ts';
+import { ExportService } from './export.ts';
 import { ItemService } from './items.ts';
 import { type MemoryPaths, defaultHome, pathsFor } from './paths.ts';
 import { ProjectService } from './projects.ts';
@@ -35,6 +37,8 @@ export class EnveMemory {
   readonly search: SearchService;
   readonly activity: ActivityService;
   readonly clients: ClientService;
+  readonly backups: BackupService;
+  readonly exports: ExportService;
   readonly files: FileService;
   private readonly db: DatabaseSync;
   private readonly ctx: Context;
@@ -58,6 +62,8 @@ export class EnveMemory {
     this.search = new SearchService(this.ctx, this.items, this.embeddings);
     this.activity = new ActivityService(this.ctx, this.projects);
     this.clients = new ClientService(this.ctx);
+    this.backups = new BackupService(this.ctx, paths);
+    this.exports = new ExportService(this.ctx, this.items, this.projects, this.decisions);
     this.files = new FileService(this.ctx, this.items);
   }
 

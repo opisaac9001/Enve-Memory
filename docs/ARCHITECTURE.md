@@ -51,7 +51,17 @@ Distribution will need a compile-to-JS step: Node refuses to strip types from fi
 - Windows: `%APPDATA%\Enve Memory\`
 - Linux: `$XDG_CONFIG_HOME/Enve Memory/` (default `~/.config/…`)
 
-The folder contains `memory.sqlite` (with `-wal`/`-shm` files) and `backups/`.
+The folder contains `memory.sqlite` (with `-wal`/`-shm` files), `attachments/` (content-addressed file blobs, plus `.trash/` for 30 days after deletion) and `backups/`. The embedding model lives in the OS cache folder (`~/Library/Caches/Enve Memory/models`, `%LOCALAPPDATA%\Enve Memory\Cache`, `~/.cache/enve-memory`; override with `$ENVE_MEMORY_CACHE`). It's shared by every library, never backed up, and re-downloads if cleared.
+
+## Backups and export
+
+- **Snapshots:** `VACUUM INTO` copies taken while the library stays open. `runSchedule()` keeps 24 hourly, 30 daily and 12 monthly. The desktop app and `serve` call it every 10 minutes; `enve-memory backup` takes one on demand.
+- **Restore:** `enve-memory restore <file|latest> --yes` verifies the snapshot (integrity check, schema version, looks like a library), snapshots the current library first as `pre-restore-*` so the restore can be undone, swaps the file in, and brings back any attachments the snapshot needs from `.trash/`. Other processes must be closed first.
+- **Export Everything:** `enve-memory export <folder>` writes readable Markdown and the original files, plus a complete `metadata.json`:
+  - per project: `README.md` (description, instructions, memory), `decisions.md`, `tasks.md` and `links.md`
+  - `notes/` with YAML front matter
+  - `archive/`: the saved page text
+  - `files/`: the originals
 
 ## Concurrency
 
