@@ -123,6 +123,20 @@ test('import, rules and graph from the command line', () => {
   assert.equal(cli(home, ['import', 'pocket', bookmarks]).code, 2);
 });
 
+test('shelves and reminders from the command line', () => {
+  const home = tempHome();
+  const video = json(home, ['link', 'https://youtube.com/watch?v=1', '--no-fetch']).item;
+  assert.equal(video.intent, 'watch');
+  assert.ok(json(home, ['pin', video.id]).pinnedAt);
+  assert.deepEqual(json(home, ['list', '--pinned']).map((i: { id: string }) => i.id), [video.id]);
+  assert.ok(json(home, ['remind', video.id, 'next', 'week']).remindAt);
+  assert.deepEqual(json(home, ['reminders']).map((i: { id: string }) => i.id), [video.id]);
+  assert.equal(json(home, ['remind', video.id, 'off']).remindAt, null);
+  assert.equal(json(home, ['intent', video.id, 'revisit']).intent, 'revisit');
+  assert.deepEqual(json(home, ['list', '--intent', 'revisit']).map((i: { id: string }) => i.id), [video.id]);
+  assert.equal(cli(home, ['remind', video.id, 'someday']).code, 1);
+});
+
 test('errors are reported with distinct exit codes', () => {
   const home = tempHome();
   assert.equal(cli(home, ['show', 'nope']).code, 1);

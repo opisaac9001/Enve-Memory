@@ -8,7 +8,7 @@ const oneLine = (text: string, max = 80) => {
 
 const localDate = (iso: string) => new Date(iso).toLocaleDateString('en-CA');
 
-const label = (item: Pick<Item, 'title' | 'url'> & { body?: string }) =>
+export const label = (item: Pick<Item, 'title' | 'url'> & { body?: string }) =>
   oneLine(item.title || item.body || item.url || '(untitled)');
 
 const taskMark = (task: Task['task']) =>
@@ -18,7 +18,8 @@ export function itemLine(item: Item | Task): string {
   const mark = 'task' in item && item.task ? taskMark(item.task) : `${item.type}:`;
   const project = item.project ? `  (${item.project.name})` : '';
   const due = 'task' in item && item.task?.dueAt ? `  due ${item.task.dueAt}` : '';
-  return `${mark} ${label(item)}${project}${due}\n    ${item.id}`;
+  const marks = `${item.pinnedAt ? '  📌' : ''}${item.intent && item.intent !== 'read' ? `  [${item.intent}]` : ''}`;
+  return `${mark} ${label(item)}${project}${due}${marks}\n    ${item.id}`;
 }
 
 export function hitLine(hit: SearchHit): string {

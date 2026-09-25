@@ -194,3 +194,57 @@ test('lists page with a before cursor and an offset', async () => {
   assert.equal((await call('GET', '/api/v1/tasks?offset=-1', reader)).status, 400);
   assert.equal((await call('GET', '/api/v1/items?before=garbage', reader)).status, 400);
 });
+
+test('capture can pin, remind and set intent in one go; shelves list them', async () => {
+  const saved = await call('POST', '/api/v1/capture', extension, {
+    url: 'https://www.amazon.com/dp/B0KEYBOARD', title: 'Keyboard', remind: 'tomorrow', pinned: true,
+  });
+  assert.equal(saved.status, 201);
+  assert.equal(saved.data.item.intent, 'buy');
+  assert.ok(saved.data.item.pinnedAt);
+  assert.ok(saved.data.item.remindAt);
+  const reread = await call('POST', '/api/v1/capture', extension, { url: 'https://example.com/essay', intent: 'revisit' });
+  assert.equal(reread.data.item.intent, 'revisit');
+  assert.equal((await call('POST', '/api/v1/capture', extension, { url: 'https://example.com/x', intent: 'someday' })).status, 400);
+
+  assert.ok((await call('GET', '/api/v1/items?pinned=true', reader)).data.some((i: { id: string }) => i.id === saved.data.item.id));
+  assert.ok((await call('GET', '/api/v1/items?intent=buy', reader)).data.some((i: { id: string }) => i.id === saved.data.item.id));
+  assert.ok((await call('GET', '/api/v1/reminders', reader)).data.some((i: { id: string }) => i.id === saved.data.item.id));
+  assert.equal((await call('GET', '/api/v1/reminders?due=true', reader)).data.length, 0);
+
+  assert.equal((await call('POST', `/api/v1/items/${saved.data.item.id}/opened`, extension)).status, 200);
+  assert.ok(memory.items.get(saved.data.item.id).openedAt);
+  assert.equal((await call('PUT', `/api/v1/items/${saved.data.item.id}/reminder`, extension, { at: null })).status, 403, 'changing it later needs write');
+  assert.equal((await call('PUT', `/api/v1/items/${saved.data.item.id}/reminder`, writer, { at: null })).data.remindAt, null);
+  assert.equal((await call('POST', `/api/v1/items/${saved.data.item.id}/pin`, writer, { pinned: false })).data.pinnedAt, null);
+});
+
+test('batch capture imports many at once and reports each entry', async () => {
+  const result = await call('POST', '/api/v1/capture/batch', extension, {
+    items: [
+      { url: 'https://example.com/batch-1', title: 'One', tags: ['imported'] },
+      { url: 'https://example.com/batch-2', title: 'Two' },
+      { url: 'https://example.com/batch-1' },
+      { url: 'not a url' },
+      'nonsense',
+    ],
+  });
+  assert.equal(result.status, 200);
+  assert.deepEqual([result.data.created, result.data.skipped, result.data.failed], [2, 1, 2]);
+  assert.equal((await call('POST', '/api/v1/capture/batch', extension, { items: Array(2001).fill({}) })).status, 400);
+});
+
+test('related finds what the library already knows about a page', async () => {
+  memory.items.saveNote({ title: 'Rolling code notes', body: 'Security+ rolling codes and replay protection' });
+  const related = await call('GET', `/api/v1/related?q=${encodeURIComponent('How rolling codes work')}&url=${encodeURIComponent('https://example.com/rolling')}`, reader);
+  assert.equal(related.status, 200);
+  assert.equal(related.data[0].title, 'Rolling code notes');
+  assert.deepEqual((await call('GET', '/api/v1/related', reader)).data, []);
+});
+
+test('accepting AI suggestions over the API needs write', async () => {
+  const note = memory.items.saveNote({ body: 'needs filing' });
+  memory.items.suggest(note.id, { status: 'done', at: new Date().toISOString(), model: 'test', summary: 's', tags: ['filed'], project: null });
+  assert.equal((await call('POST', `/api/v1/items/${note.id}/accept`, extension)).status, 403);
+  assert.deepEqual((await call('POST', `/api/v1/items/${note.id}/accept`, writer)).data.tags, ['filed']);
+});

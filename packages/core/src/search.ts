@@ -92,6 +92,7 @@ export class SearchService {
 
 function toHit(row: ItemRow, snippet: string, match: SearchHit['match']): SearchHit {
   const item = toItem(row);
+  const preview = item.body.replace(/\s+/g, ' ').trim();
   return {
     id: item.id,
     type: item.type,
@@ -99,6 +100,7 @@ function toHit(row: ItemRow, snippet: string, match: SearchHit['match']): Search
     url: item.url,
     project: item.project,
     snippet,
+    preview: preview.length > 160 ? `${preview.slice(0, 160)}…` : preview,
     match,
     taskStatus: row.task_status,
     updatedAt: item.updatedAt,

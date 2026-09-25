@@ -5,7 +5,7 @@ import { basename, join } from 'node:path';
 import type { SQLInputValue } from 'node:sqlite';
 import { SHA256_PATTERN, blobPath, removeBlobIfUnused } from './blobs.ts';
 import { type Context, HLC_PATTERN, newId, normalizeTag, slugify } from './context.ts';
-import { invalid } from './errors.ts';
+import { MemoryError, invalid } from './errors.ts';
 import type { ItemService } from './items.ts';
 import type { SettingsService } from './settings.ts';
 import { type Change, ITEM_TYPES, RELATION_KINDS } from './types.ts';
@@ -40,7 +40,10 @@ export interface SyncResult {
   devices: number;
 }
 
-const ITEM_FIELDS = ['id', 'type', 'title', 'body', 'url', 'content', 'metadata', 'project_id', 'source', 'created_at', 'updated_at', 'archived_at'];
+const ITEM_FIELDS = [
+  'id', 'type', 'title', 'body', 'url', 'content', 'metadata', 'project_id', 'source', 'created_at', 'updated_at', 'archived_at',
+  'intent', 'pinned_at', 'opened_at', 'remind_at', 'reminded_at',
+];
 const PROJECT_FIELDS = ['id', 'name', 'slug', 'description', 'instructions', 'memory', 'status', 'created_at', 'updated_at'];
 const APPLY_ORDER: Record<Entity, number> = { project: 0, item: 1, relation: 2 };
 const EXPORTED_SEQ = 'sync.exported_seq';
@@ -153,7 +156,7 @@ export class SyncService {
       writeMarker(folder, { version: 1, encryption: null });
       return null;
     }
-    if (marker.encryption && !hex) throw invalid('This sync folder is encrypted. Enter its passphrase to sync with it.');
+    if (marker.encryption && !hex) throw new MemoryError('locked', 'This sync folder is encrypted. Enter its passphrase to sync with it.');
     if (!marker.encryption && hex) throw invalid('This sync folder is not encrypted, but this library expects encryption. Choose the right folder or stop syncing.');
     return hex ? new Sealer(Buffer.from(hex, 'hex')) : null;
   }

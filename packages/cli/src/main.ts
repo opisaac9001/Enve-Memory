@@ -28,6 +28,8 @@ Capture
 Find
   search <query…>              Full-text search      [-p project] [--type] [-t tag] [--limit] [--all]
   list                         Recent items          [-p project] [--type] [-t tag] [--limit] [--all]
+                               shelves: [--pinned] [--intent read|watch|buy|revisit] [--unopened days] [--reminders]
+  reminders                    Upcoming reminders, soonest first
   show <id>                    One item in full      [--content] prints the archived text
   open <id>                    Open a link in the browser or a file in its app
   task list                    Tasks                 [-p project] [--status active|open|in_progress|done|cancelled|all]
@@ -46,6 +48,9 @@ Organize
   task edit <id>               Change a task         [--title] [--notes] [--status] [--due] [--priority] [-p project]
   task done <id>               Complete a task
   tag <id>                     Retag                 [--add tag]… [--remove tag]…
+  pin <id> / unpin <id>        Keep an item on the pinned shelf
+  remind <id> <when…>          "tonight", "tomorrow", "friday", "in 3 days", 2026-10-01…; "remind <id> off" clears
+  intent <id> <intent>         read | watch | buy | revisit | none
   relate <from> <kind> <to>    Link two items        kind: related_to|references|derived_from|depends_on
   archive <id> / unarchive <id>
   delete <id> --yes            Permanently delete
@@ -146,6 +151,10 @@ const { values: opts, positionals } = parseCommandLine({
     from: { type: 'string' },
     limit: { type: 'string' },
     all: { type: 'boolean' },
+    pinned: { type: 'boolean' },
+    intent: { type: 'string' },
+    unopened: { type: 'string' },
+    reminders: { type: 'boolean' },
     yes: { type: 'boolean' },
   },
 });
@@ -175,7 +184,11 @@ const text = (from: number, name: string) => {
 
 const limit = () => (opts.limit === undefined ? undefined : Number(opts.limit));
 
-const filter = () => ({ project: opts.project, type: opts.type, tag: opts.tag?.[0], includeArchived: opts.all });
+const filter = () => ({
+  project: opts.project, type: opts.type, tag: opts.tag?.[0], includeArchived: opts.all,
+  pinned: opts.pinned, intent: opts.intent, reminders: opts.reminders,
+  unopenedDays: opts.unopened === undefined ? undefined : Number(opts.unopened),
+});
 
 function emit(data: unknown, human: string): void {
   console.log(opts.json ? JSON.stringify(data, null, 2) : human);
@@ -217,6 +230,7 @@ async function run(memory: EnveMemory): Promise<void> {
       }
       if (!target) throw new UsageError('That item has no link or file to open.');
       openExternal(target);
+      memory.items.markOpened(item.id);
       return emit({ opened: target }, `Opened ${target}`);
     }
     case 'index': {
@@ -265,6 +279,25 @@ async function run(memory: EnveMemory): Promise<void> {
         title: opts.title, body: opts.body, url: opts.url, project: opts['no-project'] ? null : opts.project,
       });
       return emit(item, format.itemDetail(item));
+    }
+    case 'pin':
+    case 'unpin': {
+      const item = memory.items.pin(arg(0, 'id'), command === 'pin');
+      return emit(item, `${command === 'pin' ? 'Pinned' : 'Unpinned'} ${format.label(item)}`);
+    }
+    case 'remind': {
+      const when = text(1, 'when');
+      const item = memory.items.setReminder(arg(0, 'id'), when === 'off' ? null : when);
+      return emit(item, item.remindAt ? `Reminder set for ${new Date(item.remindAt).toLocaleString()}` : 'Reminder cleared.');
+    }
+    case 'reminders': {
+      const items = memory.items.list({ reminders: true }, limit());
+      return emit(items, items.map((i) => `${new Date(i.remindAt!).toLocaleString()}  ${format.itemLine(i)}`).join('\n') || 'No reminders.');
+    }
+    case 'intent': {
+      const value = arg(1, 'intent');
+      const item = memory.items.setIntent(arg(0, 'id'), value === 'none' ? null : value);
+      return emit(item, `${format.label(item)}: ${item.intent ?? 'no intent'}`);
     }
     case 'tag': {
       const item = memory.items.tag(arg(0, 'id'), { add: opts.add, remove: opts.remove });

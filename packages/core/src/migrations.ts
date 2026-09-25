@@ -266,4 +266,20 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT;
     `,
   },
+  {
+    name: 'shelves_and_reminders',
+    sql: `
+      ALTER TABLE items ADD COLUMN pinned_at TEXT;
+      -- Last time the user opened the item or its link; drives "unopened for a month".
+      ALTER TABLE items ADD COLUMN opened_at TEXT;
+      ALTER TABLE items ADD COLUMN remind_at TEXT;
+      -- When the current reminder was delivered, so it fires once.
+      ALTER TABLE items ADD COLUMN reminded_at TEXT;
+      -- What the user means to do with it: read, watch, buy or revisit.
+      ALTER TABLE items ADD COLUMN intent TEXT;
+      CREATE INDEX items_pinned ON items(pinned_at) WHERE pinned_at IS NOT NULL;
+      CREATE INDEX items_remind ON items(remind_at) WHERE remind_at IS NOT NULL;
+      CREATE INDEX items_intent ON items(intent) WHERE intent IS NOT NULL;
+    `,
+  },
 ];

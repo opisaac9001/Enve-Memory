@@ -84,12 +84,12 @@ function describe(item: ItemDetail): string {
 }
 
 /** Enriches newly saved items in the background of a long-running process. */
-export function enrichWorker(memory: EnveMemory, provider: () => AiProvider | null): DrainWorker {
+export function enrichWorker(memory: EnveMemory, provider: () => AiProvider | null, after?: () => void): DrainWorker {
   return new DrainWorker('enrich', async () => {
     const active = memory.settings.get('aiEnrich') ? provider() : null;
     if (!active) return 0;
     const ids = memory.items.pendingEnrichment(memory.settings.get('aiEnrichSince'), 5);
     for (const id of ids) await enrichItem(memory, active, id);
     return ids.length;
-  });
+  }, after);
 }

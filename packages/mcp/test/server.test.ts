@@ -104,6 +104,7 @@ test('scopes decide which tools a client can see', async () => {
   assert.ok(readOnly.includes('search') && readOnly.includes('get_project'));
   assert.equal(readOnly.some((n) => n.startsWith('save_') || n.startsWith('create_') || n.startsWith('update_')), false);
   assert.deepEqual(await names({ scopes: ['capture'], transport: 'http' }), ['create_task', 'save_file', 'save_link', 'save_note']);
+  assert.ok((await names({ scopes: ['write'], transport: 'http' })).includes('set_reminder'));
   const writer = await names({ scopes: ['write'], transport: 'http' });
   assert.ok(writer.includes('save_note') && writer.includes('set_project_memory') && !writer.includes('search'));
 });
@@ -167,4 +168,17 @@ test('HTTP clients cannot make the server read local paths', async () => {
   assert.equal('path' in (saveFile.inputSchema.properties ?? {}), false);
   const result = await client.callTool({ name: 'save_file', arguments: { path: '/etc/hosts' } });
   assert.equal(result.isError, true);
+});
+
+test('reminders, pins and shelves through MCP', async () => {
+  const { call } = await connect();
+  const video = (await call('save_link', { url: 'https://www.youtube.com/watch?v=abc', title: 'Bench rig build' }));
+  assert.equal(video.intent, 'watch');
+  const reminded = await call('set_reminder', { id: video.id, when: 'in 2 days' });
+  assert.ok(Date.parse(reminded.remindAt) > Date.now() + 86_400_000);
+  await call('pin_item', { id: video.id });
+  assert.deepEqual((await call('list_items', { pinned: true })).map((i: { id: string }) => i.id), [video.id]);
+  assert.deepEqual((await call('list_items', { reminders: true })).map((i: { id: string }) => i.id), [video.id]);
+  assert.equal((await call('set_intent', { id: video.id, intent: 'revisit' })).intent, 'revisit');
+  await assert.rejects(call('set_reminder', { id: video.id, when: 'whenever' }), /Couldn't understand/);
 });

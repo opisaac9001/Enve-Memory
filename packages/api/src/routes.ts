@@ -1,4 +1,4 @@
-import type { ApiClient, ClientScope, EnveMemory } from '@enve-memory/core';
+import { type ApiClient, type ClientScope, type EnveMemory, INTENTS, type Intent } from '@enve-memory/core';
 import { HttpError } from './errors.ts';
 
 export interface RouteContext {
@@ -15,7 +15,7 @@ export interface Route {
   /** null: any valid token, e.g. so a capture-only client can confirm it's connected. */
   scope: ClientScope | null;
   status?: number;
-  handle: (ctx: RouteContext) => unknown;
+  handle: (ctx: RouteContext) => unknown | Promise<unknown>;
 }
 
 const badField = (name: string, expected: string) => new HttpError(400, 'invalid', `"${name}" must be ${expected}.`);
@@ -57,10 +57,43 @@ const queryFilter = (query: URLSearchParams) => ({
   includeArchived: query.get('archived') === 'true',
   inbox: query.get('inbox') === 'true',
   before: query.get('before') ?? undefined,
+  pinned: query.get('pinned') === 'true' || undefined,
+  intent: query.get('intent') ?? undefined,
+  reminders: query.get('reminders') === 'true' || undefined,
+  unopenedDays: query.get('unopened') === null ? undefined : Number(query.get('unopened')),
 });
 
 const ID = '([^/]+)';
 const path = (template: string) => new RegExp(`^/api/v1${template.replaceAll(':id', ID)}$`);
+
+function bool(body: RouteContext['body'], name: string): boolean | undefined {
+  const value = body?.[name];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'boolean') throw badField(name, 'true or false');
+  return value;
+}
+
+const MAX_BATCH = 2000;
+
+/** One capture: a URL becomes a bookmark (re-saving merges), anything else a note. Pin, reminder and intent apply at capture time. */
+function capture(memory: EnveMemory, body: RouteContext['body']) {
+  const url = str(body, 'url');
+  const note = captureNote(str(body, 'note'), str(body, 'selection'));
+  const common = { title: str(body, 'title'), project: str(body, 'project'), tags: strList(body, 'tags') };
+  const intent = str(body, 'intent');
+  const saved = url
+    ? memory.items.saveLink({ ...common, url, note, ...(intent ? { intent: oneOfIntent(intent) } : {}) })
+    : { item: memory.items.saveNote({ ...common, body: note ?? '' }), created: true };
+  const remind = str(body, 'remind');
+  if (remind) memory.items.setReminder(saved.item.id, remind);
+  if (bool(body, 'pinned')) memory.items.pin(saved.item.id, true);
+  return { item: remind || bool(body, 'pinned') ? memory.items.get(saved.item.id) : saved.item, created: saved.created };
+}
+
+function oneOfIntent(value: string): Intent {
+  if (!(INTENTS as readonly string[]).includes(value)) throw badField('intent', `one of ${INTENTS.join(', ')}`);
+  return value as Intent;
+}
 
 /** Combines the page note and any selected text into one bookmark note. */
 function captureNote(note: string | undefined, selection: string | undefined): string | undefined {
@@ -111,6 +144,34 @@ export const routes: Route[] = [
         title: str(body, 'title'), body: str(body, 'body'), url: nullableStr(body, 'url'), project: nullableStr(body, 'project'),
       }),
   },
+  {
+    method: 'POST', pattern: path('/items/:id/pin'), scope: 'write',
+    handle: ({ memory, params, body }) => memory.items.pin(params[0]!, bool(body, 'pinned') ?? true),
+  },
+  {
+    // A signal, not an edit: capture-only clients (the extension) may report that a saved link was opened.
+    method: 'POST', pattern: path('/items/:id/opened'), scope: 'capture',
+    handle: ({ memory, params }) => {
+      memory.items.markOpened(params[0]!);
+      return { ok: true };
+    },
+  },
+  {
+    method: 'PUT', pattern: path('/items/:id/reminder'), scope: 'write',
+    handle: ({ memory, params, body }) => memory.items.setReminder(params[0]!, nullableStr(body, 'at') ?? null),
+  },
+  {
+    method: 'PUT', pattern: path('/items/:id/intent'), scope: 'write',
+    handle: ({ memory, params, body }) => memory.items.setIntent(params[0]!, nullableStr(body, 'intent') ?? null),
+  },
+  {
+    method: 'POST', pattern: path('/items/:id/accept'), scope: 'write',
+    handle: ({ memory, params }) => memory.items.acceptSuggestions(params[0]!),
+  },
+  {
+    method: 'GET', pattern: path('/reminders'), scope: 'read',
+    handle: ({ memory, query }) => (query.get('due') === 'true' ? memory.items.dueReminders() : memory.items.list({ reminders: true }, queryLimit(query))),
+  },
   { method: 'POST', pattern: path('/items/:id/archive'), scope: 'write', handle: ({ memory, params }) => memory.items.archive(params[0]!) },
   { method: 'POST', pattern: path('/items/:id/unarchive'), scope: 'write', handle: ({ memory, params }) => memory.items.unarchive(params[0]!) },
   {
@@ -121,12 +182,42 @@ export const routes: Route[] = [
   {
     // The browser extension and share sheets post here: a URL becomes a bookmark, anything else a note.
     method: 'POST', pattern: path('/capture'), scope: 'capture', status: 201,
+    handle: ({ memory, body }) => capture(memory, body),
+  },
+  {
+    // Bulk capture, e.g. importing a browser's whole bookmark tree. Each entry succeeds or fails on its own.
+    method: 'POST', pattern: path('/capture/batch'), scope: 'capture',
     handle: ({ memory, body }) => {
-      const url = str(body, 'url');
-      const note = captureNote(str(body, 'note'), str(body, 'selection'));
-      const common = { title: str(body, 'title'), project: str(body, 'project'), tags: strList(body, 'tags') };
-      if (url) return memory.items.saveLink({ ...common, url, note });
-      return { item: memory.items.saveNote({ ...common, body: note ?? '' }), created: true };
+      const entries = body?.items;
+      if (!Array.isArray(entries)) throw badField('items', 'an array');
+      if (entries.length > MAX_BATCH) throw badField('items', `at most ${MAX_BATCH} entries`);
+      const results = entries.map((entry) => {
+        try {
+          if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw badField('item', 'an object');
+          const { item, created } = capture(memory, entry as Record<string, unknown>);
+          return { id: item.id, created };
+        } catch (error) {
+          return { error: (error as Error).message };
+        }
+      });
+      return {
+        created: results.filter((r) => 'created' in r && r.created).length,
+        skipped: results.filter((r) => 'created' in r && !r.created).length,
+        failed: results.filter((r) => 'error' in r).length,
+        results,
+      };
+    },
+  },
+  {
+    // What's already in the library about the page you're looking at.
+    method: 'GET', pattern: path('/related'), scope: 'read',
+    handle: async ({ memory, query }) => {
+      const url = query.get('url');
+      const saved = url ? memory.items.findByUrl(url) : null;
+      const text = [query.get('q'), saved?.title, saved?.metadata.excerpt].filter(Boolean).join(' ');
+      if (!text.trim()) return [];
+      const hits = await memory.search.hybrid(text, {}, (queryLimit(query) ?? 8) + 1);
+      return hits.filter((h) => h.id !== saved?.id && h.url !== url).slice(0, queryLimit(query) ?? 8);
     },
   },
 

@@ -4,6 +4,8 @@ export { cacheDir, defaultHome, pathsFor, type MemoryPaths } from './paths.ts';
 export { migrate, openDatabase, schemaVersion, transaction } from './db.ts';
 export { MIGRATIONS, type Migration } from './migrations.ts';
 export { toFtsQuery } from './search.ts';
+export { parseWhen } from './when.ts';
+export { detectIntent } from './intent.ts';
 export { normalizeTag } from './context.ts';
 export { type Embedder, type VectorHit, chunkText } from './embeddings.ts';
 export { MAX_LIMIT, pageCursor } from './items.ts';

@@ -33,7 +33,7 @@ export interface ApiServer {
   close(): Promise<void>;
 }
 
-const STATUS_FOR: Record<MemoryError['code'], number> = { not_found: 404, invalid: 400, conflict: 409, schema: 500 };
+const STATUS_FOR: Record<MemoryError['code'], number> = { not_found: 404, invalid: 400, conflict: 409, schema: 500, locked: 423 };
 
 export function createApiServer(memory: EnveMemory, options: ApiServerOptions): ApiServer {
   const inFlight = new Set<string>();
@@ -101,9 +101,7 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
         requireScope(client, 'capture');
         if (replay) return replayResponse(res, replay);
         const data = await readBody(req, MAX_FILE_BODY);
-        // Set right before the synchronous write: another request may have run while the body streamed in.
-        memory.actor = `api:${client.name}`;
-        const result = memory.files.save({
+        const result = memory.withActor(`api:${client.name}`, () => memory.files.save({
           data,
           filename: header(req, 'x-filename') ?? '',
           mimeType: req.headers['content-type'],
@@ -111,7 +109,7 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
           note: header(req, 'x-note'),
           project: header(req, 'x-project'),
           tags: header(req, 'x-tags')?.split(',').map((t) => t.trim()).filter(Boolean),
-        });
+        }));
         changed();
         return respond(201, result);
       }
@@ -139,9 +137,9 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
       if (match.route.scope) requireScope(client, match.route.scope);
       if (replay) return replayResponse(res, replay);
       const body = req.method === 'GET' ? undefined : await readJson(req);
-      // Set after the body is read: another request may have run in the meantime.
-      memory.actor = `api:${client.name}`;
-      const result = match.route.handle({ memory, client, params: match.params, query: url.searchParams, body });
+      const route = match.route;
+      const result = await memory.withActor(`api:${client.name}`, () =>
+        route.handle({ memory, client, params: match.params, query: url.searchParams, body }));
       if (req.method !== 'GET') changed();
       respond(match.route.status ?? 200, result);
     } catch (error) {
@@ -163,6 +161,7 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
     close: async () => {
       await ingest.idle();
       await mcp.close();
+      if (!server.listening) return;
       await new Promise<void>((resolve) => {
         server.close(() => resolve());
         server.closeAllConnections();

@@ -21,7 +21,7 @@ Two transports:
 |---|---|---|
 | `search` | read | Hybrid keyword + meaning search with project / type / tag filters; each hit says whether it matched on `keyword`, `semantic` or `both` |
 | `get_item` | read | Full item with tags, task fields, relations, attachments and archived `content` (paged 20k characters at a time via `content_offset`) |
-| `list_items` | read | Recent items, filterable; bodies trimmed to a 280-char preview |
+| `list_items` | read | Recent items filtered by project / type / tag or a shelf (pinned, intent, unopened for N days, reminders); bodies trimmed to a 280-char preview |
 | `list_projects` | read | Projects (archived ones hidden by default) |
 | `get_project` | read | **Briefing**: description, instructions, memory document, decision log, open tasks, recent notes/links |
 | `list_tasks` | read | Tasks by due date then priority; `active` = open or in progress |
@@ -30,6 +30,8 @@ Two transports:
 | `save_file` | capture | Save a file from base64 content, or, over stdio only, from a local path. PDFs and text become searchable. |
 | `get_file` | read | The file itself: images as image content the model can see, text as text |
 | `save_link` | capture | New bookmark, fetched and archived before returning (≤10 s) so the model sees the real title and excerpt; an already-saved URL returns the existing one (`created: false`) and merges the note and tags |
+| `set_reminder` | write | Remind the user about an item: "tomorrow", "friday", "in 3 days" or an ISO time |
+| `pin_item`, `set_intent` | write | Pin an item; set its intent (read / watch / buy / revisit) |
 | `update_item` | write | Edit title / body / URL / project. Refuses decisions. |
 | `archive_item` | write | Hide from lists and search (reversible) |
 | `tag_item` | write | Add/remove tags |

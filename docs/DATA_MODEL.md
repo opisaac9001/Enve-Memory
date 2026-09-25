@@ -12,7 +12,7 @@ One `items` table holds notes, bookmarks, tasks, decisions, files and images. Fu
 
 | Table | Purpose |
 |---|---|
-| `items` | `seq` (rowid alias), `id` (UUIDv7), `type`, `title`, `body` (the user's own words), `url`, `content` (text extracted from the source: untrusted), `metadata` (JSON: site, byline, excerpt, dates, word/page counts, `ingest.status`), `project_id`, `source` (the actor that created it), timestamps, `archived_at` |
+| `items` | `seq` (rowid alias), `id` (UUIDv7), `type`, `title`, `body` (the user's own words), `url`, `content` (text extracted from the source: untrusted), `metadata` (JSON: site, byline, excerpt, dates, word/page counts, `ingest.status`, `ai` suggestions), `intent` (read / watch / buy / revisit; guessed for links from the address and Open Graph type until the user sets one), `pinned_at`, `opened_at`, `remind_at` + `reminded_at` (fires once; rescheduling re-arms), `project_id`, `source` (the actor that created it), timestamps, `archived_at` |
 | `attachments` | `item_id`, `sha256`, `filename`, `mime_type`, `size`. The bytes live at `attachments/<sha[0:2]>/<sha>`, written atomically and shared by identical files. |
 | `tasks` | `item_id`, `status` (open / in_progress / done / cancelled), `priority` (1 high, 2 normal, 3 low), `due_at`, `completed_at` |
 | `projects` | `id`, `name`, `slug` (unique handle for CLI/MCP), `description`, `instructions`, `memory` (Markdown document), `status` (active / paused / done / archived) |

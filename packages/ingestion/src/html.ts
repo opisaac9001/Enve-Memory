@@ -60,6 +60,7 @@ export function extractHtml(html: string, url: string): Extracted {
     publishedAt: normalizeDate(published ?? article?.publishedTime ?? undefined),
     image: absolute(meta('og:image', 'twitter:image')),
     lang: lang || article?.lang || undefined,
+    ogType: meta('og:type'),
     wordCount: text.split(/\s+/).filter(Boolean).length,
   };
   return { title: (article?.title || metaTitle || '').trim(), content, metadata: prune(metadata) };

@@ -115,7 +115,7 @@ export class TaskService {
       where.push('t.status = ?');
       params.push(listStatus);
     }
-    return this.ctx
+    return this.items.withTags(this.ctx
       .all<ItemRow>(
         `SELECT ${ITEM_COLUMNS} FROM ${ITEM_FROM}
          WHERE ${where.join(' AND ')}
@@ -123,7 +123,7 @@ export class TaskService {
          LIMIT ? OFFSET ?`,
         ...params, clampLimit(limit), Math.max(0, Math.trunc(offset)),
       )
-      .map(toTask);
+      .map(toTask));
   }
 }
 

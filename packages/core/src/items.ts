@@ -4,10 +4,12 @@ import {
 } from './context.ts';
 import { MemoryError, invalid, notFound } from './errors.ts';
 import { type AttachmentRow, removeBlobIfUnused, toAttachment } from './blobs.ts';
+import { detectIntent } from './intent.ts';
+import { parseWhen } from './when.ts';
 import type { ProjectService } from './projects.ts';
 import type { SettingsService } from './settings.ts';
 import {
-  type AiSuggestions, ITEM_TYPES, type Item, type ItemDetail, type ItemMetadata, type ItemType, RELATION_KINDS, type RelatedItem, type RelationKind,
+  type AiSuggestions, INTENTS, type Intent, ITEM_TYPES, type Item, type ItemDetail, type ItemMetadata, type ItemType, RELATION_KINDS, type RelatedItem, type RelationKind,
 } from './types.ts';
 
 export interface ItemFilter {
@@ -16,6 +18,12 @@ export interface ItemFilter {
   inbox?: boolean;
   /** Paging cursor: `<updatedAt>,<id>` of the last item of the previous page (see pageCursor). */
   before?: string;
+  pinned?: boolean;
+  intent?: string;
+  /** Bookmarks saved at least this many days ago and never opened. */
+  unopenedDays?: number;
+  /** Items with a reminder set; list() orders them soonest first. */
+  reminders?: boolean;
   type?: string;
   tag?: string;
   includeArchived?: boolean;
@@ -33,6 +41,7 @@ export interface NewItem {
   /** Importers restoring an Enve export keep the original id and creation time. */
   id?: string;
   createdAt?: string;
+  intent?: Intent | null;
 }
 
 export interface SourceUpdate {
@@ -57,6 +66,8 @@ export interface SaveLinkInput {
   tags?: string[];
   /** Fetch and extract the page afterwards. Defaults to the library's fetchLinks setting. */
   ingest?: boolean;
+  /** Why it's being saved; guessed from the address when omitted. */
+  intent?: Intent;
 }
 
 export interface UpdateItemInput {
@@ -120,9 +131,62 @@ export class ItemService {
     }
     const id = this.insert({
       type: 'bookmark', url, title: input.title, body: input.note, project: input.project, tags: input.tags,
-      metadata: (input.ingest ?? this.settings.get('fetchLinks')) ? { ingest: { status: 'pending' } } : {},
+      metadata: {
+        ...((input.ingest ?? this.settings.get('fetchLinks')) ? { ingest: { status: 'pending' as const } } : {}),
+        intentAuto: input.intent === undefined,
+      },
+      intent: input.intent ?? detectIntent(url),
     });
     return { item: this.get(id), created: true };
+  }
+
+  pin(id: string, pinned: boolean): ItemDetail {
+    const row = this.row(id);
+    if (pinned !== (row.pinned_at !== null)) {
+      const pinnedAt = pinned ? this.ctx.now() : null;
+      this.write(row, { pinned_at: pinnedAt }, pinned ? 'pin' : 'unpin', { pinned_at: pinnedAt }, false);
+    }
+    return this.get(row.id);
+  }
+
+  /** Records that the user opened the item or its link. */
+  markOpened(id: string): void {
+    const now = this.ctx.now();
+    this.write(this.row(id), { opened_at: now }, 'open', { opened_at: now }, false);
+  }
+
+  /** `when` is anything parseWhen understands; null clears the reminder. */
+  setReminder(id: string, when: string | null): ItemDetail {
+    const row = this.row(id);
+    const remindAt = when === null ? null : parseWhen(when);
+    this.write(row, { remind_at: remindAt, reminded_at: null }, 'remind', { remind_at: remindAt }, false);
+    return this.get(row.id);
+  }
+
+  setIntent(id: string, intent: string | null): ItemDetail {
+    const row = this.row(id);
+    const value = intent === null ? null : oneOf(intent, INTENTS, 'intent');
+    const metadata = { ...(JSON.parse(row.metadata) as ItemMetadata), intentAuto: false };
+    this.write(row, { intent: value, metadata: JSON.stringify(metadata) }, 'intent', { intent: value }, false);
+    return this.get(row.id);
+  }
+
+  /** Reminders whose time has come and that haven't been delivered yet. */
+  dueReminders(now = new Date()): Item[] {
+    return this.withTags(this.ctx
+      .all<ItemRow>(
+        `SELECT ${ITEM_COLUMNS} FROM ${ITEM_FROM}
+         WHERE i.remind_at IS NOT NULL AND i.remind_at <= ? AND i.reminded_at IS NULL AND i.archived_at IS NULL
+         ORDER BY i.remind_at`,
+        now.toISOString(),
+      )
+      .map(toItem));
+  }
+
+  /** Marks a reminder delivered so it fires once; it stays listed until cleared or rescheduled. */
+  markReminded(id: string): void {
+    const now = this.ctx.now();
+    this.write(this.row(id), { reminded_at: now }, 'reminded', { reminded_at: now }, false);
   }
 
   /** The active bookmark for a URL, if one exists. */
@@ -148,11 +212,11 @@ export class ItemService {
     const metadata = input.metadata ?? {};
     this.ctx.tx(() => {
       this.ctx.run(
-        `INSERT INTO items (id, type, title, body, url, content, metadata, project_id, source, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        id, input.type, title, body, url, content, JSON.stringify(metadata), projectId, this.ctx.actor, created, created,
+        `INSERT INTO items (id, type, title, body, url, content, metadata, intent, project_id, source, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, input.type, title, body, url, content, JSON.stringify(metadata), input.intent ?? null, projectId, this.ctx.actor, created, created,
       );
-      this.ctx.record('item', id, 'create', projectId, { type: input.type, title, body, url, content, metadata, projectId });
+      this.ctx.record('item', id, 'create', projectId, { type: input.type, title, body, url, content, metadata, intent: input.intent ?? null, projectId });
       if (tags.length) this.applyTags(id, projectId, tags, []);
     });
     this.afterSave?.(id);
@@ -191,6 +255,12 @@ export class ItemService {
     };
     if (update.content !== undefined) changes.content = update.content;
     if (update.title?.trim() && !row.title) changes.title = update.title.trim();
+    // The page's Open Graph type can sharpen a guessed intent (a video → watch), never one the user chose.
+    const current = JSON.parse(row.metadata) as ItemMetadata;
+    if (update.metadata.ogType && row.url && row.type === 'bookmark' && current.intentAuto !== false) {
+      const intent = detectIntent(row.url, update.metadata.ogType);
+      if (intent !== row.intent) changes.intent = intent;
+    }
     this.write(row, changes, 'ingest', { ...changes, metadata: update.metadata });
     this.afterSave?.(row.id);
     return this.get(row.id);
@@ -260,14 +330,27 @@ export class ItemService {
 
   list(filter: ItemFilter = {}, limit?: number): Item[] {
     const { where, params } = this.filterClauses(filter);
-    return this.ctx
+    return this.withTags(this.ctx
       .all<ItemRow>(
         `SELECT ${ITEM_COLUMNS} FROM ${ITEM_FROM}
          ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-         ORDER BY i.updated_at DESC, i.id DESC LIMIT ?`,
+         ORDER BY ${filter.reminders ? 'i.remind_at, ' : filter.pinned ? 'i.pinned_at DESC, ' : ''}i.updated_at DESC, i.id DESC LIMIT ?`,
         ...params, clampLimit(limit),
       )
-      .map(toItem);
+      .map(toItem));
+  }
+
+  /** Fills in tags for a page of items with one query. */
+  withTags<T extends Item>(items: T[]): T[] {
+    if (items.length === 0) return items;
+    const rows = this.ctx.all<{ item_id: string; name: string }>(
+      `SELECT it.item_id, t.name FROM item_tags it JOIN tags t ON t.id = it.tag_id
+       WHERE it.item_id IN (${items.map(() => '?').join(', ')}) ORDER BY t.name`,
+      ...items.map((i) => i.id),
+    );
+    const byItem = new Map<string, string[]>();
+    for (const row of rows) byItem.set(row.item_id, [...(byItem.get(row.item_id) ?? []), row.name]);
+    return items.map((item) => ({ ...item, tags: byItem.get(item.id) ?? [] }));
   }
 
   update(id: string, input: UpdateItemInput): ItemDetail {
@@ -352,13 +435,14 @@ export class ItemService {
     return row;
   }
 
-  write(row: ItemRow, changes: Record<string, SQLInputValue>, op: string, data: object = changes): void {
+  /** `touch: false` for changes that aren't edits (pinning, opening, reminders), so "recently updated" stays meaningful. */
+  write(row: ItemRow, changes: Record<string, SQLInputValue>, op: string, data: object = changes, touch = true): void {
     if (Object.keys(data).length === 0) return;
     this.ctx.tx(() => {
-      this.ctx.run(
-        `UPDATE items SET ${[...Object.keys(changes), 'updated_at'].map((k) => `${k} = ?`).join(', ')} WHERE id = ?`,
-        ...Object.values(changes), this.ctx.now(), row.id,
-      );
+      const fields = { ...changes, ...(touch ? { updated_at: this.ctx.now() } : {}) };
+      if (Object.keys(fields).length) {
+        this.ctx.run(`UPDATE items SET ${Object.keys(fields).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`, ...Object.values(fields), row.id);
+      }
       const projectId = 'project_id' in changes ? (changes.project_id as string | null) : row.project_id;
       this.ctx.record('item', row.id, op, projectId, data);
     });
@@ -369,6 +453,17 @@ export class ItemService {
     const params: SQLInputValue[] = [];
     if (!filter.includeArchived) where.push('i.archived_at IS NULL');
     if (filter.inbox) where.push('i.project_id IS NULL');
+    if (filter.pinned) where.push('i.pinned_at IS NOT NULL');
+    if (filter.reminders) where.push('i.remind_at IS NOT NULL');
+    if (filter.intent !== undefined) {
+      where.push('i.intent = ?');
+      params.push(oneOf(filter.intent, INTENTS, 'intent'));
+    }
+    if (filter.unopenedDays !== undefined) {
+      if (!Number.isInteger(filter.unopenedDays) || filter.unopenedDays < 0) throw invalid('unopenedDays must be a non-negative integer.');
+      where.push(`i.type = 'bookmark' AND i.opened_at IS NULL AND i.created_at <= ?`);
+      params.push(new Date(Date.now() - filter.unopenedDays * 86_400_000).toISOString());
+    }
     if (filter.before) {
       const [updatedAt, id] = filter.before.split(',');
       if (!updatedAt || !id) throw invalid('"before" must be "<updatedAt>,<id>" from the last item of the previous page.');

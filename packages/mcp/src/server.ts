@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import {
-  CLIENT_SCOPES, type ClientScope, EnveMemory, ITEM_TYPES, type Item, type ItemDetail, PROJECT_STATUSES, type Project, RELATION_KINDS,
+  CLIENT_SCOPES, type ClientScope, EnveMemory, INTENTS, ITEM_TYPES, type Item, type ItemDetail, PROJECT_STATUSES, type Project, RELATION_KINDS,
   TASK_PRIORITIES, TASK_STATUSES, type Task, isPlainText,
 } from '@enve-memory/core';
 import { ingestItem } from '@enve-memory/ingestion';
@@ -43,6 +43,10 @@ const summary = (item: Item | Task) => ({
   url: item.url,
   project: item.project?.name ?? null,
   preview: truncate(item.body),
+  tags: item.tags,
+  ...(item.intent ? { intent: item.intent } : {}),
+  ...(item.pinnedAt ? { pinned: true } : {}),
+  ...(item.remindAt ? { remindAt: item.remindAt } : {}),
   ...('task' in item && item.task ? { task: item.task } : {}),
   source: item.source,
   updatedAt: item.updatedAt,
@@ -120,8 +124,8 @@ export function createServer(memory: EnveMemory, version: string, access: Server
     if (!allows(access.scopes, scope)) return;
     // The SDK's callback type is a conditional on S that TypeScript cannot resolve for a generic S.
     server.registerTool<StandardSchemaWithJSON, S>(name, config, (async (args: z.infer<S>, ctx: ServerContext) => {
-      memory.actor = `mcp:${clientName(server, ctx) ?? access.clientName ?? 'unknown'}`;
-      return reply(await run(args));
+      // Only the synchronous start of a handler runs as this client; anything after an await sets its own actor.
+      return reply(await memory.withActor(`mcp:${clientName(server, ctx) ?? access.clientName ?? 'unknown'}`, () => run(args)));
     }) as unknown as ToolCallback<S>);
   };
 
@@ -151,15 +155,42 @@ export function createServer(memory: EnveMemory, version: string, access: Server
 
   tool('list_items', 'read', {
     title: 'List items',
-    description: 'Most recently updated items, optionally filtered by project, type or tag.',
+    description: 'Most recently updated items, optionally filtered by project, type, tag, or a shelf: pinned, intent (read / watch / buy / revisit), saved-but-never-opened, or with a reminder (soonest first).',
     inputSchema: z.object({
       project: project.optional(),
       type: z.enum(ITEM_TYPES).optional(),
       tag: z.string().optional(),
+      pinned: z.boolean().optional(),
+      intent: z.enum(INTENTS).optional(),
+      unopened_days: z.number().int().min(0).optional().describe('Links saved at least this many days ago and never opened'),
+      reminders: z.boolean().optional(),
       limit: limit.optional().describe('Default 50'),
     }),
     annotations: READ,
-  }, (a) => memory.items.list({ project: a.project, type: a.type, tag: a.tag }, a.limit).map(summary));
+  }, (a) => memory.items.list({
+    project: a.project, type: a.type, tag: a.tag, pinned: a.pinned, intent: a.intent, unopenedDays: a.unopened_days, reminders: a.reminders,
+  }, a.limit).map(summary));
+
+  tool('set_reminder', 'write', {
+    title: 'Set reminder',
+    description: 'Remind the user about an item. `when` accepts plain words ("tonight", "tomorrow", "friday", "next week", "in 3 days") or an ISO date/time; null clears the reminder. The desktop app shows it as a notification.',
+    inputSchema: z.object({ id: itemId, when: z.string().nullable() }),
+    annotations: { ...WRITE, idempotentHint: true },
+  }, (a) => summary(memory.items.setReminder(a.id, a.when)));
+
+  tool('pin_item', 'write', {
+    title: 'Pin item',
+    description: 'Pin (or unpin) an item so it stays on the pinned shelf.',
+    inputSchema: z.object({ id: itemId, pinned: z.boolean().default(true) }),
+    annotations: { ...WRITE, idempotentHint: true },
+  }, (a) => summary(memory.items.pin(a.id, a.pinned)));
+
+  tool('set_intent', 'write', {
+    title: 'Set intent',
+    description: 'Say what the user means to do with an item: read, watch, buy or revisit (null clears). Links get a guessed intent when saved.',
+    inputSchema: z.object({ id: itemId, intent: z.enum(INTENTS).nullable() }),
+    annotations: { ...WRITE, idempotentHint: true },
+  }, (a) => summary(memory.items.setIntent(a.id, a.intent)));
 
   tool('save_note', 'capture', {
     title: 'Save note',

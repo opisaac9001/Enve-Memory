@@ -26,7 +26,7 @@ export function SearchPalette({ onClose, onOpen }: { onClose: () => void; onOpen
     const run = text
       ? call('search.hybrid', text, filter, 30)
       : call('items.list', filter, 12).then((items) => items.map((item): SearchHit => ({
-          id: item.id, type: item.type, title: displayTitle(item), url: item.url, project: item.project, snippet: '',
+          id: item.id, type: item.type, title: displayTitle(item), url: item.url, project: item.project, snippet: '', preview: '',
           match: 'keyword', taskStatus: null, updatedAt: item.updatedAt,
         })));
     const timer = setTimeout(() => {

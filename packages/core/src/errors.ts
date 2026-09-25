@@ -1,4 +1,5 @@
-export type MemoryErrorCode = 'not_found' | 'invalid' | 'conflict' | 'schema';
+/** `locked`: an encrypted sync folder needs its passphrase. */
+export type MemoryErrorCode = 'not_found' | 'invalid' | 'conflict' | 'schema' | 'locked';
 
 export class MemoryError extends Error {
   readonly code: MemoryErrorCode;

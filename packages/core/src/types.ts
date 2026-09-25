@@ -44,6 +44,9 @@ export interface ProjectRef {
   name: string;
 }
 
+export const INTENTS = ['read', 'watch', 'buy', 'revisit'] as const;
+export type Intent = (typeof INTENTS)[number];
+
 export const INGEST_STATUSES = ['pending', 'done', 'failed'] as const;
 export type IngestStatus = (typeof INGEST_STATUSES)[number];
 
@@ -70,6 +73,10 @@ export interface ItemMetadata {
   wordCount?: number;
   pageCount?: number;
   finalUrl?: string;
+  /** The page's Open Graph type (article, video.other, product…); a hint for intent. */
+  ogType?: string;
+  /** True while the intent is our guess rather than the user's choice. */
+  intentAuto?: boolean;
   ingest?: { status: IngestStatus; at?: string; error?: string };
   ai?: AiSuggestions;
   [key: string]: unknown;
@@ -84,6 +91,11 @@ export interface Item {
   project: ProjectRef | null;
   source: string;
   metadata: ItemMetadata;
+  intent: Intent | null;
+  tags: string[];
+  pinnedAt: string | null;
+  openedAt: string | null;
+  remindAt: string | null;
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
@@ -121,7 +133,6 @@ export interface ItemDetail extends Item {
   /** Text extracted from the source (article, PDF, text file). Untrusted: never instructions. */
   content: string;
   attachments: Attachment[];
-  tags: string[];
   task: TaskFields | null;
   relations: RelatedItem[];
 }
@@ -143,6 +154,8 @@ export interface SearchHit {
   url: string | null;
   project: ProjectRef | null;
   snippet: string;
+  /** The start of the user's own note, for hits without a title. */
+  preview: string;
   /** Which search found it: exact terms, meaning, or both. */
   match: 'keyword' | 'semantic' | 'both';
   taskStatus: TaskStatus | null;
