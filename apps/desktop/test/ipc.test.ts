@@ -14,14 +14,14 @@ test('the allow-list names every method once, each with a known kind', () => {
     assert.match(method, /^[a-z]+\.[a-zA-Z]+$/);
     assert.ok(METHOD_KINDS[method] === 'read' || METHOD_KINDS[method] === 'write');
   }
-  assert.deepEqual([...EVENTS].sort(), ['changed', 'command']);
+  assert.deepEqual([...EVENTS].sort(), ['changed', 'command', 'open']);
 });
 
 test('mutating calls are marked as writes so windows refresh and workers run', () => {
-  for (const method of ['items.saveNote', 'items.saveLink', 'items.update', 'items.delete', 'projects.setMemory', 'decisions.record', 'tasks.update', 'files.save', 'clients.revoke', 'sync.now'] as Method[]) {
+  for (const method of ['items.saveNote', 'items.saveLink', 'items.update', 'items.delete', 'projects.setMemory', 'decisions.record', 'tasks.update', 'files.save', 'clients.revoke', 'sync.now', 'items.pin', 'items.setReminder', 'items.setIntent', 'items.openUrl', 'items.openFile'] as Method[]) {
     assert.equal(METHOD_KINDS[method], 'write', method);
   }
-  for (const method of ['items.get', 'items.list', 'search.hybrid', 'activity.recent', 'app.info'] as Method[]) {
+  for (const method of ['items.get', 'items.list', 'search.hybrid', 'activity.recent', 'app.info', 'shelves.counts', 'shelves.list', 'reminders.list'] as Method[]) {
     assert.equal(METHOD_KINDS[method], 'read', method);
   }
 });

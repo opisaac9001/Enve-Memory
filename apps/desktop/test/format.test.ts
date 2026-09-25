@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { actorInfo, displayTitle, dueInfo, snippetParts } from '../src/renderer/lib/format.ts';
+import { actorInfo, displayTitle, dueInfo, formatReminder, snippetParts } from '../src/renderer/lib/format.ts';
 
 test('search snippets split into highlighted and plain parts', () => {
   assert.deepEqual(snippetParts('the [rolling] code [replay] attack'), [
@@ -29,4 +29,15 @@ test('actors read as people and tools', () => {
   assert.deepEqual(actorInfo('api:Chrome extension'), { label: 'Chrome extension · API', kind: 'device' });
   assert.equal(actorInfo('desktop').kind, 'you');
   assert.equal(actorInfo('ingest').kind, 'background');
+});
+
+test('reminder times read relative to now', () => {
+  const now = new Date(2026, 8, 24, 10);
+  const at = (days: number, hour: number) => new Date(2026, 8, 24 + days, hour).toISOString();
+  assert.match(formatReminder(at(0, 20), now), /^Tonight /);
+  assert.match(formatReminder(at(0, 11), now), /^Today /);
+  assert.match(formatReminder(at(1, 9), now), /^Tomorrow /);
+  assert.match(formatReminder(at(-1, 9), now), /^Yesterday /);
+  assert.match(formatReminder(at(3, 10), now), /^Sun /);
+  assert.match(formatReminder(at(20, 9), now), /^Oct 14, /);
 });

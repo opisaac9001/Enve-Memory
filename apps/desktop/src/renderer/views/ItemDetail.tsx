@@ -4,6 +4,7 @@ import { call, errorMessage, useLive } from '../lib/api.ts';
 import { TYPE_LABELS, actorInfo, formatBytes, formatDate, formatDateTime, relativeTime, siteOf } from '../lib/format.ts';
 import { useApp } from '../context.ts';
 import { Icon, MarkdownEditor, MarkdownView, ProjectSelect, TagEditor, TypeIcon, useDraft, useFeedback } from '../ui.tsx';
+import { IntentChips, PinButton, RemindMenu } from './ItemActions.tsx';
 
 const STATUS_LABELS: Record<TaskStatus, string> = { open: 'Open', in_progress: 'In progress', done: 'Done', cancelled: 'Cancelled' };
 
@@ -76,12 +77,19 @@ function ItemBody({ item, onClose }: { item: ItemDetail; onClose: () => void }) 
 
       <div className="item-facts">
         {item.url && (
-          <button className="link-button url" onClick={() => void call('app.openExternal', item.url!)} title={item.url}>
+          <button className="link-button url" onClick={() => call('items.openUrl', item.id).catch(fail)} title={item.url}>
             <Icon name="external" size={14} /> {item.url}
           </button>
         )}
         <span>Saved {relativeTime(item.createdAt)} by {actorInfo(item.source).label}</span>
+        {item.openedAt && item.url && <span>Last opened {relativeTime(item.openedAt)}</span>}
         {item.archivedAt && <span className="badge">Archived</span>}
+      </div>
+
+      <div className="item-actions">
+        <PinButton item={item} />
+        {!decision && <RemindMenu item={item} />}
+        {!decision && item.type !== 'task' && <IntentChips item={item} />}
       </div>
 
       <div className="field-row">

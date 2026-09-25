@@ -1,6 +1,6 @@
 import type { CaptureRequest } from '../App.tsx';
 import { call, useLive } from '../lib/api.ts';
-import { dueInfo, displayTitle, isDueSoon } from '../lib/format.ts';
+import { dueInfo, displayTitle, formatReminder, isDueSoon } from '../lib/format.ts';
 import { useApp } from '../context.ts';
 import { Icon } from '../ui.tsx';
 import { CaptureBar } from './CaptureBar.tsx';
@@ -15,6 +15,9 @@ export function Home({ capture }: { capture: CaptureRequest }) {
   const { info, projects, go, openItem } = useApp();
   const recent = useLive(() => call('items.list', {}, 40), []);
   const tasks = useLive(() => call('tasks.list', { status: 'active' }, 100), []);
+  const reminders = useLive(() => call('reminders.list'), []);
+  const soonCutoff = new Date(Date.now() + 2 * 86_400_000).toISOString();
+  const nextReminders = [...(reminders.data?.due ?? []), ...(reminders.data?.upcoming ?? []).filter((r) => r.remindAt! <= soonCutoff)].slice(0, 5);
 
   const items = (recent.data ?? []).filter((item) => item.type !== 'task' && item.type !== 'decision').slice(0, 10);
   const openTasks = tasks.data ?? [];
@@ -66,11 +69,29 @@ export function Home({ capture }: { capture: CaptureRequest }) {
               <button className="link-button" onClick={() => go({ view: 'library' })}>All items</button>
             </div>
             {items.length === 0 ? <p className="muted">Nothing saved yet.</p> : (
-              <div className="rows">{items.map((item) => <ItemRow key={item.id} item={item} tags={item.tags} onOpen={openItem} />)}</div>
+              <div className="rows">{items.map((item) => <ItemRow key={item.id} item={item} onOpen={openItem} />)}</div>
             )}
           </section>
 
           <div className="home-side">
+            {nextReminders.length > 0 && (
+              <section className="panel" aria-labelledby="reminders-heading">
+                <div className="panel-header">
+                  <h2 id="reminders-heading">Reminders</h2>
+                  <button className="link-button" onClick={() => go({ view: 'reminders' })}>All</button>
+                </div>
+                <ul className="mini-list">
+                  {nextReminders.map((item) => (
+                    <li key={item.id}>
+                      <button onClick={() => openItem(item.id)}>
+                        <span>{displayTitle(item)}</span>
+                        <span className={`due ${item.remindAt! <= new Date().toISOString() ? 'overdue' : 'soon'}`}>{formatReminder(item.remindAt!)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <section className="panel" aria-labelledby="due-heading">
               <div className="panel-header">
                 <h2 id="due-heading">{soon.length ? 'Due soon' : 'Open tasks'}</h2>

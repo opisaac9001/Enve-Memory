@@ -1,6 +1,6 @@
 import type { ItemType } from '@enve-memory/core';
 import { createContext, useContext } from 'react';
-import type { AppInfo, ProjectSummary } from '../shared/ipc.ts';
+import type { AppInfo, ProjectSummary, Shelf } from '../shared/ipc.ts';
 
 export type LibraryType = Exclude<ItemType, 'task' | 'decision'>;
 
@@ -16,6 +16,8 @@ export type Route =
   | { view: 'ask' }
   | { view: 'activity' }
   | { view: 'graph' }
+  | { view: 'shelf'; shelf: Shelf }
+  | { view: 'reminders' }
   | { view: 'settings'; section?: SettingsSection };
 
 export interface AppState {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { ItemPage, ListedItem } from '../../shared/ipc.ts';
+import type { Item } from '@enve-memory/core';
+import type { ItemPage } from '../../shared/ipc.ts';
 import { call, errorMessage, useLive } from '../lib/api.ts';
 import { useApp, type LibraryType } from '../context.ts';
 import { Empty, useFeedback } from '../ui.tsx';
@@ -25,7 +26,7 @@ export function Library({ type }: { type?: LibraryType }) {
   useEffect(() => setPages(1), [type, tag, archived]);
   const list = useLive(async () => {
     const filter = { type, tag: tag || undefined, includeArchived: archived };
-    const loaded: ListedItem[] = [];
+    const loaded: Item[] = [];
     let cursor: string | null = null;
     for (let page = 0; page < pages; page++) {
       const result: ItemPage = await call('items.page', filter, cursor, PAGE_SIZE);
@@ -69,7 +70,7 @@ export function Library({ type }: { type?: LibraryType }) {
       </div>
       {list.data && items.length === 0 && <Empty title={tag ? `Nothing tagged #${tag}` : 'Nothing here yet'}>{tag ? undefined : copy.empty}</Empty>}
       <div className="rows">
-        {items.map((item) => <ItemRow key={item.id} item={item} tags={item.tags} onOpen={openItem} />)}
+        {items.map((item) => <ItemRow key={item.id} item={item} onOpen={openItem} />)}
       </div>
       {list.data?.more && (
         <div className="load-more">

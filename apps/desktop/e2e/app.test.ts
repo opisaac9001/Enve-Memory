@@ -63,11 +63,12 @@ function seedSuggestion(): void {
   `]);
 }
 
-/** Replaces native dialogs in the main process so tests never block on a picker or open Finder. */
+/** Replaces native dialogs in the main process so tests never block on a picker, open Finder or launch a browser. */
 async function stubDialogs(folder: string): Promise<void> {
   await app.evaluate(({ dialog, shell }, dir) => {
     dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [dir] })) as typeof dialog.showOpenDialog;
     shell.showItemInFolder = () => {};
+    shell.openExternal = async () => {};
   }, folder);
 }
 
@@ -444,6 +445,77 @@ describe('Enve Memory desktop', { timeout: 180_000 }, () => {
     await page.getByText(/imported 2, skipped 0 already saved/).waitFor();
     await nav('Links');
     await page.locator('.item-row').filter({ hasText: 'ESP32 pinout' }).getByText('#hardware').waitFor();
+  });
+
+  test('pins, reminds and sorts items onto shelves', async () => {
+    await stubDialogs(home);
+    await nav('Links');
+    const row = page.locator('.item-row').filter({ hasText: 'ESP32 pinout' });
+    await row.hover();
+    await row.getByRole('button', { name: 'Pin', exact: true }).click();
+    await row.getByRole('button', { name: 'Unpin' }).waitFor();
+    await nav('Pinned');
+    await page.locator('.item-row').filter({ hasText: 'ESP32 pinout' }).waitFor();
+
+    const pinned = page.locator('.item-row').filter({ hasText: 'ESP32 pinout' });
+    await pinned.hover();
+    await pinned.getByRole('button', { name: 'Remind me' }).click();
+    await page.getByRole('menuitem', { name: 'Tomorrow' }).click();
+    await page.getByText(/I’ll remind you tomorrow/).waitFor();
+    await nav('Reminders');
+    await page.getByRole('region', { name: 'Upcoming' }).getByText('ESP32 pinout').waitFor();
+
+    await nav('Read');
+    const level = page.locator('.item-row').filter({ hasText: 'Level shifters, explained' });
+    await level.getByRole('button').first().click();
+    const drawer = page.getByRole('dialog', { name: 'Link details' });
+    await drawer.getByRole('group', { name: 'Intent' }).getByRole('button', { name: 'Watch' }).click();
+    await drawer.getByRole('button', { name: 'Watch', pressed: true }).waitFor();
+    await drawer.getByRole('button', { name: /example\.net\/level-shifters/ }).click();
+    await drawer.getByText('Last opened just now').waitFor();
+    await page.keyboard.press('Escape');
+    await nav('Watch');
+    await page.locator('.item-row').filter({ hasText: 'Level shifters, explained' }).waitFor();
+    await nav('Read');
+    await page.locator('.item-row').filter({ hasText: 'Rolling codes, explained' }).waitFor();
+    assert.equal(await page.locator('.item-row').filter({ hasText: 'Level shifters, explained' }).count(), 0);
+  });
+
+  test('delivers a due reminder as a notification that opens the item', async () => {
+    await app.evaluate(({ Notification }) => {
+      const shown: unknown[] = [];
+      (globalThis as { shownReminders?: unknown[] }).shownReminders = shown;
+      Notification.prototype.show = function show(this: unknown) {
+        shown.push(this);
+      };
+    });
+    const list = await call('items.list', { type: 'bookmark' }, 200) as { ok: true; value: { id: string; title: string }[] };
+    const target = list.value.find((item) => item.title === 'Level shifters, explained')!;
+    await call('items.setReminder', target.id, new Date(Date.now() - 60_000).toISOString());
+
+    let delivered: { title: string; body: string }[] = [];
+    for (let i = 0; i < 30 && delivered.length === 0; i++) {
+      delivered = await app.evaluate(() =>
+        ((globalThis as { shownReminders?: { title: string; body: string }[] }).shownReminders ?? []).map((n) => ({ title: n.title, body: n.body })));
+      if (!delivered.length) await page.waitForTimeout(200);
+    }
+    assert.deepEqual(delivered, [{ title: 'Time to watch', body: 'Level shifters, explained' }]);
+
+    await nav('Home');
+    await app.evaluate(() => (globalThis as { shownReminders?: { emit(e: string): void }[] }).shownReminders![0]!.emit('click'));
+    await page.getByRole('dialog', { name: 'Link details' }).getByLabel('Title').and(page.locator('[value="Level shifters, explained"]')).waitFor();
+    await page.keyboard.press('Escape');
+
+    await nav('Reminders');
+    const due = page.getByRole('region', { name: 'Due' });
+    await due.getByText('Level shifters, explained').waitFor();
+    await shot('reminders-dark');
+    await due.getByRole('button', { name: 'Snooze' }).click();
+    await page.getByRole('menuitem', { name: 'Next week' }).click();
+    await page.getByRole('region', { name: 'Upcoming' }).getByText('Level shifters, explained').waitFor();
+    assert.equal(await page.getByRole('region', { name: 'Due' }).count(), 0);
+    const again = await app.evaluate(() => (globalThis as { shownReminders?: unknown[] }).shownReminders!.length);
+    assert.equal(again, 1, 'a delivered reminder is not shown twice');
   });
 
   test('pages through a large library', async () => {

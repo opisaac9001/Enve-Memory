@@ -1,7 +1,7 @@
 import type { Answer } from '@enve-memory/ai';
 import type {
   ApiClient, Backup, Change, ClientScope, CreateProjectInput, CreateRuleInput, CreateTaskInput, Decision, ExportSummary, Graph, Item,
-  ItemDetail, ItemFilter, ItemType, Project, ProjectBriefing, RecordDecisionInput, Rule, SaveLinkInput, SaveNoteInput, SearchHit,
+  Intent, ItemDetail, ItemFilter, ItemType, Project, ProjectBriefing, RecordDecisionInput, Rule, SaveLinkInput, SaveNoteInput, SearchHit,
   Settings, SyncResult, Task, UpdateItemInput, UpdateProjectInput, UpdateTaskInput,
 } from '@enve-memory/core';
 import type { ImportResult } from '@enve-memory/importers';
@@ -30,10 +30,6 @@ export interface Prefs {
   lan: boolean;
   shortcut: string;
   shortcutRegistered: boolean;
-}
-
-export interface ListedItem extends Item {
-  tags: string[];
 }
 
 export interface ProjectSummary extends Project {
@@ -80,6 +76,7 @@ export interface AiStatus {
   baseUrl: string;
   enrich: boolean;
   enrichSince: string;
+  autoApply: boolean;
   providers: ProviderOption[];
   /** Providers with a key saved in the encrypted store. */
   keys: string[];
@@ -124,14 +121,26 @@ export interface SyncStatus {
   running: boolean;
   /** The folder is encrypted and this library has no key yet. */
   needsPassphrase: boolean;
-  last: { at: string; result: SyncResult | null; error: string | null } | null;
+  last: { at: string; result: SyncResult | null; error: string | null; code: string | null } | null;
 }
 
 export const IMPORT_KINDS = ['bookmarks', 'markdown', 'csv', 'enve'] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
+/** Sidebar shelves: pinned, by intent, and links saved a month ago but never opened. */
+export const SHELVES = ['pinned', 'read', 'watch', 'buy', 'revisit', 'unopened'] as const;
+export type Shelf = (typeof SHELVES)[number];
+export const UNOPENED_DAYS = 30;
+
+export type ShelfCounts = Record<Shelf | 'reminders' | 'due', number>;
+
+export interface Reminders {
+  due: Item[];
+  upcoming: Item[];
+}
+
 export interface ItemPage {
-  items: ListedItem[];
+  items: Item[];
   /** Cursor for the next page, or null when this was the last one. */
   next: string | null;
 }
@@ -153,9 +162,9 @@ export interface Api {
   'prefs.get': () => Prefs;
   'prefs.setTheme': (theme: ThemeMode) => Prefs;
 
-  'items.list': (filter?: ItemFilter, limit?: number) => ListedItem[];
+  'items.list': (filter?: ItemFilter, limit?: number) => Item[];
   'items.page': (filter: ItemFilter, cursor: string | null, limit: number) => ItemPage;
-  'items.inbox': () => ListedItem[];
+  'items.inbox': () => Item[];
   'items.get': (id: string) => ItemDetail;
   'items.saveNote': (input: SaveNoteInput) => ItemDetail;
   'items.saveLink': (input: SaveLinkInput) => { item: ItemDetail; created: boolean };
@@ -169,6 +178,13 @@ export interface Api {
   'items.retryIngest': (id: string) => ItemDetail;
   'items.retryFailed': () => number;
   'items.openFile': (id: string) => void;
+  'items.openUrl': (id: string) => void;
+  'items.pin': (id: string, pinned: boolean) => ItemDetail;
+  'items.setReminder': (id: string, when: string | null) => ItemDetail;
+  'items.setIntent': (id: string, intent: Intent | null) => ItemDetail;
+  'shelves.counts': () => ShelfCounts;
+  'shelves.list': (shelf: Shelf) => Item[];
+  'reminders.list': () => Reminders;
   'files.save': (paths: string[], project?: string) => ItemDetail[];
 
   'projects.list': (status?: string) => ProjectSummary[];
@@ -197,6 +213,7 @@ export interface Api {
   'ai.models': (config: AiConfig) => string[];
   'ai.test': (config: AiConfig) => string;
   'ai.setEnrich': (on: boolean) => AiStatus;
+  'ai.setAutoApply': (on: boolean) => AiStatus;
   'ai.ask': (question: string, project?: string) => Answer;
 
   'clients.list': () => ApiClient[];
@@ -257,7 +274,14 @@ export const METHOD_KINDS: Record<Method, 'read' | 'write'> = {
   'items.enrich': 'write',
   'items.retryIngest': 'write',
   'items.retryFailed': 'write',
-  'items.openFile': 'read',
+  'items.openFile': 'write',
+  'items.openUrl': 'write',
+  'items.pin': 'write',
+  'items.setReminder': 'write',
+  'items.setIntent': 'write',
+  'shelves.counts': 'read',
+  'shelves.list': 'read',
+  'reminders.list': 'read',
   'files.save': 'write',
   'projects.list': 'read',
   'projects.create': 'write',
@@ -281,6 +305,7 @@ export const METHOD_KINDS: Record<Method, 'read' | 'write'> = {
   'ai.models': 'read',
   'ai.test': 'read',
   'ai.setEnrich': 'write',
+  'ai.setAutoApply': 'write',
   'ai.ask': 'read',
   'clients.list': 'read',
   'clients.create': 'write',
@@ -321,8 +346,8 @@ export interface CallError {
 
 export type Envelope<T = unknown> = { ok: true; value: T } | { ok: false; error: CallError };
 
-/** Events main pushes to renderers. `command` carries a menu/shortcut action such as `search` or `new-note`. */
-export const EVENTS = ['changed', 'command'] as const;
+/** Events main pushes to renderers. `command` carries a menu/shortcut action such as `search`; `open` an item id to show. */
+export const EVENTS = ['changed', 'command', 'open'] as const;
 export type EventName = (typeof EVENTS)[number];
 
 export const COMMANDS = ['search', 'new-note', 'save-link', 'settings', 'import'] as const;

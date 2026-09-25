@@ -17,7 +17,7 @@ export interface LibraryOptions {
 const POLL_MS = 1500;
 const BACKUP_MS = 10 * 60_000;
 const SYNC_MS = 2 * 60_000;
-export const DESKTOP_ACTOR = 'desktop';
+const DESKTOP_ACTOR = 'desktop';
 
 /** The open library plus everything that runs beside it in the main process: API server, workers, backups, sync. */
 export class Library {
@@ -55,7 +55,7 @@ export class Library {
   async start(): Promise<void> {
     this.current = EnveMemory.open({ home: this.options.home, actor: DESKTOP_ACTOR });
     this.attachEmbedder();
-    this.enricher = enrichWorker(this.current, () => this.provider());
+    this.enricher = enrichWorker(this.current, () => this.provider(), this.options.onChanged);
     await this.startApi();
     this.markSeen();
     this.kick();
@@ -137,9 +137,9 @@ export class Library {
       // Yield first so the "syncing" state reaches the UI before the synchronous run blocks the main process.
       await new Promise((resolve) => setTimeout(resolve, 0));
       result = memory.withActor(DESKTOP_ACTOR, () => memory.sync.run());
-      this.lastSync = { at: new Date().toISOString(), result, error: null };
+      this.lastSync = { at: new Date().toISOString(), result, error: null, code: null };
     } catch (error) {
-      this.lastSync = { at: new Date().toISOString(), result: null, error: (error as Error).message };
+      this.lastSync = { at: new Date().toISOString(), result: null, error: (error as Error).message, code: error instanceof MemoryError ? error.code : null };
     } finally {
       this.syncing = false;
     }

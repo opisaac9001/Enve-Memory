@@ -10,6 +10,7 @@ Electron + React on top of the workspace packages. The app opens the same SQLite
 | ![Archived page in the item drawer](docs/item-detail-dark.png) | ![Search palette](docs/search-dark.png) |
 | ![Settings → AI tools](docs/settings-ai-tools-dark.png) | ![Settings → Devices with pairing QR codes](docs/settings-devices-dark.png) |
 | ![Graph](docs/graph-dark.png) | ![Ask with citations](docs/ask-dark.png) |
+| ![Reminders with snooze](docs/reminders-dark.png) | |
 | ![Home, light theme](docs/home-light.png) | ![Project, light theme](docs/project-light.png) |
 
 The screenshots are written by the E2E suite (`ask-dark.png` only when it runs against a real model, see below).
@@ -23,7 +24,19 @@ npm --prefix apps/desktop run dev        # Vite dev server + Electron; renderer 
 npm --prefix apps/desktop run build      # dist/: main.js, preload.cjs, cli.mjs, renderer/
 npm --prefix apps/desktop run start      # run the built app
 npx tsc -p apps/desktop                  # typecheck (main, preload, renderer, tests)
+npm --prefix apps/desktop run dist:mac   # installer: release/Enve Memory-<version>-arm64.dmg
 ```
+
+## Installers
+
+`npm --prefix apps/desktop run dist` (or `dist:mac`, `dist:win`, `dist:linux`) builds the app and runs electron-builder with [`electron-builder.yml`](electron-builder.yml): appId `com.enve.memory`, a macOS dmg, a Windows NSIS installer, and a Linux AppImage and deb, all written to `release/`. `scripts/dist.mjs` passes the installed Electron version, because Electron is hoisted to the workspace root where electron-builder doesn't look.
+
+- **What ships.** The asar holds `dist/` (main, preload, renderer, `cli.mjs`) plus the only runtime dependency, `@huggingface/transformers`, and its tree. Everything else is bundled by esbuild, so it's a devDependency. `onnxruntime-node`, `sharp` and `@img/*` are unpacked from the asar because they load native code; `onnxruntime-web` is left out (transformers inlines it for Node), and so are other operating systems' onnxruntime binaries. `npmRebuild` is off: every native module is an N-API prebuild.
+- **MCP from the installed app.** `Resources/cli.mjs` is a two-line entry point that imports the CLI inside the asar, so its imports resolve against the app's `node_modules`. AI clients run `ELECTRON_RUN_AS_NODE=1 "<app>/Contents/MacOS/Enve Memory" "<app>/Contents/Resources/cli.mjs" mcp`, which is exactly what Settings → AI tools shows for a packaged app.
+- **macOS.** Apple Silicon only for now: onnxruntime-node 1.30 has no darwin-x64 binary, and the app loads it at startup. The app is ad-hoc signed (`identity: '-'`), with no Developer ID and no notarization. On another Mac, open it the first time with right-click → Open. To distribute it, set `CSC_NAME`/`CSC_LINK`, turn on `hardenedRuntime` and notarize.
+- **Windows and Linux** are configured but not built here. Build them on their own OS (or in CI) so npm installs the matching `sharp`/`@img` binaries; a cross-build from a Mac would package the macOS ones.
+- **Icon.** `npm --prefix apps/desktop run icon` renders `build/icon.png` (and `build/icon.svg`) with sharp. electron-builder turns it into `.icns`/`.ico`.
+- **Checking a build.** `npm --prefix apps/desktop run verify:dist -- "/path/to/Enve Memory.app"` uses a throwaway library to connect the MCP SDK client to the packaged `cli.mjs` over stdio (initialize, list tools, save and search). It then starts the app on a free port and checks `/api/v1/status`. If the embedding model is already cached in `.cache/models` or `~/Library/Caches/Enve Memory/models`, it also waits for the packaged app to index with onnxruntime-node and runs a semantic search. Last, it quits the app and confirms the port is released.
 
 Environment:
 
@@ -61,6 +74,7 @@ src/
 scripts/               esbuild targets (bundle.mjs), build.mjs, dev.mjs
 ```
 
+- **Shelves and reminders.** The sidebar's shelves are core filters: Pinned (`pinned`), Read/Watch/Buy/Revisit (`intent`, guessed for links and changeable), Unopened (links saved over 30 days ago and never opened from the app; opening a link or file calls `markOpened`), and Reminders. Every minute, and whenever the library changes, main shows a native notification for each of `items.dueReminders()` and marks it delivered. Clicking the notification opens the item in the main window. The Reminders view lists Due and Upcoming and can snooze or clear.
 - **Processes.** The main process opens `EnveMemory.open({ home, actor: 'desktop' })`, starts `createApiServer` (127.0.0.1, or 0.0.0.0 in LAN mode), and runs `api.ingest`, `indexWorker` (when semantic search is on), `enrichWorker` (provider from `providerFor(memory, keyLookup)`), `backups.runSchedule()` every 10 minutes and `sync.run()` every 2 minutes and on window focus (when a sync folder is set). Every 1.5 s it reads `memory.dataVersion` and the newest change id; a new `data_version` means an MCP server or the CLI wrote, so it kicks the workers; either change tells every window to refresh.
 - **IPC.** The renderer calls `window.enve.call(method, ...args)`. Preload rejects names not in `METHOD_KINDS`, main checks the sender frame is the app's own page, then `dispatch()` runs the handler only if the name is an own key of the handler map. Handlers are typed against `Api`, so a method can't be added on one side only. Every call sets the actor to `desktop` first (the API server leaves its own actor behind). After a `write` method main kicks the workers and broadcasts `changed`; `useLive()` in the renderer reloads on it. Errors reach the UI as `{ code, message }`: `MemoryError` codes, `ai` for provider failures, `internal` otherwise.
 - **Build.** esbuild bundles main (ESM, with a `require` shim for bundled CommonJS), preload (CommonJS, required by the sandbox) and `packages/cli/src/main.ts` → `dist/cli.mjs`, resolving the `@enve-memory/*` TypeScript sources. `electron`, `onnxruntime-node`, `onnxruntime-web`, `sharp` and `@huggingface/transformers` stay external and load from `node_modules`. Vite builds the renderer into `dist/renderer` with `base: './'` for `file://`.
@@ -85,9 +99,9 @@ npm --prefix apps/desktop run test:e2e   # builds, then drives the real app with
 ENVE_E2E_OLLAMA=http://100.114.100.51:11434 npm --prefix apps/desktop run test:e2e   # also runs Ask against qwen2.5:1.5b
 ```
 
-The E2E suite uses a fresh temp library (`ENVE_MEMORY_HOME`), port `0`, semantic search and link fetching off (it turns fetching on for one local test page), `--use-mock-keychain`, and no global shortcut. It covers first launch, capture, filing from the Inbox and accepting AI suggestions, project memory + history + decisions, tasks, ⌘K search, a CLI write showing up live, archived-page rendering, MCP setup and pairing QR codes, token creation, drag-and-drop, delete confirmation, the quick-capture window, encrypted folder sync, export, restore, automations, bookmark import, paging, the graph, theme switching and a clean quit that releases the port.
+The E2E suite uses a fresh temp library (`ENVE_MEMORY_HOME`), port `0`, semantic search and link fetching off (it turns fetching on for one local test page), `--use-mock-keychain`, and no global shortcut. It covers first launch, capture, pinning, reminders and intents (shelves, snooze, and a due-reminder notification with a stubbed notifier whose click opens the item), filing from the Inbox and accepting AI suggestions, project memory + history + decisions, tasks, ⌘K search, a CLI write showing up live, archived-page rendering, MCP setup and pairing QR codes, token creation, drag-and-drop, delete confirmation, the quick-capture window, encrypted folder sync, export, restore, automations, bookmark import, paging, the graph, theme switching and a clean quit that releases the port.
 
 ## Not done yet
 
-- Packaging (electron-builder or Forge): the bundle is ready for it (`dist/cli.mjs` goes in `resources/`, and the external native packages must ship in the app's `node_modules`), but no installer is configured or signed.
 - The global shortcut isn't configurable from the UI (it's `shortcut` in `desktop.json`).
+- No Intel Mac build (see Installers), no signed/notarized build, and no Windows or Linux build verified.

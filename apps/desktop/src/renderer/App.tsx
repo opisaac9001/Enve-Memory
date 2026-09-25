@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { call, errorMessage, onCommand, useLive } from './lib/api.ts';
+import { call, errorMessage, onCommand, onOpenItem, useLive } from './lib/api.ts';
+import { SHELVES } from '../shared/ipc.ts';
 import { detectCapture } from './lib/capture.ts';
 import { AppContext, type AppState, type LibraryType, type Route } from './context.ts';
 import { Icon, type IconName, useFeedback } from './ui.tsx';
 import { Activity } from './views/Activity.tsx';
+import { RemindersView } from './views/Reminders.tsx';
+import { SHELF_COPY, ShelfView } from './views/Shelf.tsx';
 import { GraphView } from './views/Graph.tsx';
 import { Ask } from './views/Ask.tsx';
 import { Home } from './views/Home.tsx';
@@ -43,6 +46,7 @@ export function App() {
   const dragDepth = useRef(0);
 
   const info = useLive(() => call('app.info'), []);
+  const shelves = useLive(() => call('shelves.counts'), []);
   const projects = useLive(() => call('projects.list'), []);
 
   const go = useCallback((next: Route) => {
@@ -66,6 +70,10 @@ export function App() {
   }, [go, requestCapture]);
 
   useEffect(() => onCommand(runCommand), [runCommand]);
+  useEffect(() => onOpenItem((id) => {
+    setSearching(false);
+    setOpenId(id);
+  }), []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -126,6 +134,7 @@ export function App() {
   const nav = (target: Route, icon: IconName, label: string, count?: number) => {
     const active = target.view === route.view
       && (target.view !== 'library' || (route.view === 'library' && route.type === target.type))
+      && (target.view !== 'shelf' || (route.view === 'shelf' && route.shelf === target.shelf))
       && (target.view !== 'project' || (route.view === 'project' && route.id === target.id));
     return (
       <button key={`${target.view}-${label}`} className={`nav-item ${active ? 'active' : ''}`} onClick={() => go(target)} aria-current={active ? 'page' : undefined}>
@@ -175,6 +184,9 @@ export function App() {
             <div className="nav-heading"><span>Library</span></div>
             {LIBRARY_TABS.map((tab) => nav({ view: 'library', type: tab.type }, tab.type ?? 'library', tab.label))}
             {nav({ view: 'graph' }, 'graph', 'Graph')}
+            <div className="nav-heading"><span>Shelves</span></div>
+            {SHELVES.map((shelf) => nav({ view: 'shelf', shelf }, shelf === 'pinned' ? 'pin' : shelf, SHELF_COPY[shelf].title, shelves.data?.[shelf]))}
+            {nav({ view: 'reminders' }, 'bell', 'Reminders', shelves.data?.reminders)}
           </nav>
           <div className="sidebar-bottom">
             {nav({ view: 'activity' }, 'activity', 'Activity')}
@@ -191,6 +203,8 @@ export function App() {
           {route.view === 'ask' && <Ask />}
           {route.view === 'activity' && <Activity />}
           {route.view === 'graph' && <GraphView />}
+          {route.view === 'shelf' && <ShelfView shelf={route.shelf} />}
+          {route.view === 'reminders' && <RemindersView />}
           {route.view === 'settings' && <Settings section={route.section} />}
         </main>
 

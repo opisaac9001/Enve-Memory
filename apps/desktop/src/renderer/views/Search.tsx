@@ -112,7 +112,7 @@ export function SearchPalette({ onClose, onOpen }: { onClose: () => void; onOpen
               <TypeIcon type={hit.type} />
               <div className="hit-text">
                 <div className="hit-title">
-                  <span>{hit.title || hit.url || firstLine(hit.snippet.replace(/[[\]]/g, ''), 80) || 'Untitled'}</span>
+                  <span>{hit.title || hit.url || firstLine(hit.preview, 80) || firstLine(hit.snippet.replace(/[[\]]/g, ''), 80) || 'Untitled'}</span>
                   {hit.project && <span className="project-chip">{hit.project.name}</span>}
                 </div>
                 {hit.snippet && (

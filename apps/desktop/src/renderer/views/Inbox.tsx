@@ -59,7 +59,7 @@ export function Inbox() {
       <div className="rows">
         {items.map((item) => (
           <div key={item.id} className="inbox-entry">
-            <ItemRow item={item} tags={item.tags} onOpen={openItem} showProject={false}>
+            <ItemRow item={item} onOpen={openItem} showProject={false}>
               <ProjectSelect value={null} onChange={(project) => file(item, project)} projects={projects} emptyLabel="File into…" label={`File ${item.title || 'item'} into project`} />
               <button
                 className="icon-button"

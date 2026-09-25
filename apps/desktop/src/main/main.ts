@@ -3,16 +3,18 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DEFAULT_PORT } from '@enve-memory/api';
 import { defaultHome } from '@enve-memory/core';
+import type { Intent, Item } from '@enve-memory/core';
 import {
-  BrowserWindow, type MenuItemConstructorOptions, Menu, type WebFrameMain, app, globalShortcut, ipcMain, nativeTheme, safeStorage,
-  session, shell,
+  BrowserWindow, type MenuItemConstructorOptions, Menu, Notification, type WebFrameMain, app, globalShortcut, ipcMain, nativeTheme,
+  safeStorage, session, shell,
 } from 'electron';
 import { type Command, METHOD_KINDS, type ThemeMode, isMethod } from '../shared/ipc.ts';
 import { dispatch } from './dispatch.ts';
 import { createHandlers } from './handlers.ts';
-import { DESKTOP_ACTOR, Library } from './library.ts';
+import { Library } from './library.ts';
 import { PrefsFile } from './prefs.ts';
 import { SecretStore } from './secrets.ts';
+import { displayTitle } from '../shared/text.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const devServer = process.env.VITE_DEV_SERVER_URL;
@@ -124,6 +126,47 @@ function showCapture(): void {
   captureWindow.webContents.send('enve:command', 'capture-focus');
 }
 
+/** Shows the main window on an item, waiting for the page if the window is new. */
+function openItemInMain(id: string): void {
+  showMain();
+  const contents = mainWindow?.webContents;
+  if (!contents) return;
+  if (contents.isLoading()) contents.once('did-finish-load', () => contents.send('enve:open', id));
+  else contents.send('enve:open', id);
+}
+
+const REMINDER_TITLES: Record<Intent, string> = { read: 'Time to read', watch: 'Time to watch', buy: 'Still want to buy this?', revisit: 'Time to revisit' };
+// Electron drops click handlers for notifications that get garbage-collected, so keep the live ones.
+const shownReminders = new Set<Notification>();
+
+function remind(item: Item): void {
+  const notification = new Notification({
+    title: item.intent ? REMINDER_TITLES[item.intent] : 'Reminder',
+    body: displayTitle(item),
+  });
+  shownReminders.add(notification);
+  notification.on('click', () => {
+    shownReminders.delete(notification);
+    openItemInMain(item.id);
+  });
+  notification.on('close', () => shownReminders.delete(notification));
+  notification.show();
+}
+
+/** Each due reminder is shown once, then marked delivered; the Reminders view keeps listing it until it's cleared. */
+function deliverReminders(): void {
+  if (!library || quitting || !Notification.isSupported()) return;
+  try {
+    const items = library.memory.items;
+    for (const item of items.dueReminders()) {
+      remind(item);
+      items.markReminded(item.id);
+    }
+  } catch (error) {
+    console.error('reminders:', error);
+  }
+}
+
 function sendCommand(command: Command): void {
   showMain();
   mainWindow?.webContents.send('enve:command', command);
@@ -135,6 +178,7 @@ function broadcastChanged(): void {
   broadcastTimer = setTimeout(() => {
     broadcastTimer = null;
     for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('enve:changed');
+    deliverReminders();
   }, 60);
 }
 
@@ -263,11 +307,6 @@ async function start(): Promise<void> {
 
   ipcMain.handle('enve:call', async (event, method: unknown, args: unknown) => {
     if (!isTrusted(event.senderFrame)) return { ok: false, error: { code: 'forbidden', message: 'Untrusted caller.' } };
-    // The API server sets its own actor per request; every desktop call is attributed to the desktop.
-    // (While a restore swaps the library there is no memory to set; the call then fails with a retry message.)
-    try {
-      lib.memory.actor = DESKTOP_ACTOR;
-    } catch {}
     const result = await dispatch(handlers, method, args);
     if (result.ok && isMethod(method) && METHOD_KINDS[method] === 'write') lib.afterWrite();
     return result;
@@ -284,6 +323,9 @@ async function start(): Promise<void> {
       console.error('shortcut:', error);
     }
   }
+
+  deliverReminders();
+  setInterval(deliverReminders, 60_000);
 
   app.on('browser-window-focus', () => {
     if (Date.now() - lastFocusSync < 30_000) return;

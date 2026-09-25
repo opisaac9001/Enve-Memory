@@ -482,6 +482,16 @@ function AiSection() {
           <Toggle label="Enrich new items" checked={data.enrich} onChange={(on) => call('ai.setEnrich', on).then(() => status.reload(), fail)} />
         </Row>
       )}
+      {data.provider !== 'none' && data.enrich && (
+        <Row
+          label="File new items automatically"
+          detail={data.autoApply
+            ? 'Suggested tags and projects are applied as soon as they arrive, marked as the AI’s change in Activity. Items already in a project are never moved.'
+            : 'Off: suggestions wait in the Inbox until you accept them. On: they’re applied right away, and you can still change anything afterwards.'}
+        >
+          <Toggle label="File new items automatically" checked={data.autoApply} onChange={(on) => call('ai.setAutoApply', on).then(() => status.reload(), fail)} />
+        </Row>
+      )}
     </Section>
   );
 }

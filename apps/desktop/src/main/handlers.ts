@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { AiError, PROVIDERS, type ProviderId, ask, createProvider, enrichItem, isProviderId } from '@enve-memory/ai';
 import { lanUrls, pairingLink } from '@enve-memory/api';
-import { type Item, MemoryError, pageCursor } from '@enve-memory/core';
+import { type ItemFilter, MemoryError, pageCursor } from '@enve-memory/core';
 import { importBookmarks, importCsv, importEnveExport, importMarkdownFolder } from '@enve-memory/importers';
 import { ingestItem } from '@enve-memory/ingestion';
 import { type BrowserWindow, dialog, shell } from 'electron';
 import QRCode from 'qrcode';
-import { type AiConfig, type AiStatus, type AppInfo, IMPORT_KINDS, type ImportKind, type ListedItem, type Prefs, type SyncStatus, type ThemeMode } from '../shared/ipc.ts';
+import { type AiConfig, type AiStatus, type AppInfo, IMPORT_KINDS, type ImportKind, type Prefs, SHELVES, type Shelf, UNOPENED_DAYS, type SyncStatus, type ThemeMode } from '../shared/ipc.ts';
 import { DesktopError, type Handlers } from './dispatch.ts';
 import type { Library } from './library.ts';
 import { type LaunchContext, claudeAddArgs, findExecutable, mcpLaunch, setupSnippets } from './mcp.ts';
@@ -42,15 +42,11 @@ export function createHandlers(ctx: HandlerContext): Handlers {
   const { library, secrets, prefs } = ctx;
   const memory = () => library.memory;
 
-  // Lists don't carry tags; gather them per tag (most-used first) rather than loading every item's full text.
-  const withTags = (items: Item[]): ListedItem[] => {
-    const tags = new Map(items.map((item) => [item.id, [] as string[]]));
-    if (items.length) {
-      for (const tag of memory().stats().tagNames.slice(0, 200)) {
-        for (const tagged of memory().items.list({ tag, includeArchived: true }, 200)) tags.get(tagged.id)?.push(tag);
-      }
-    }
-    return items.map((item) => ({ ...item, tags: tags.get(item.id)!.sort() }));
+  const shelfFilter = (shelf: Shelf): ItemFilter => {
+    if (!SHELVES.includes(shelf)) throw new DesktopError('invalid', `Unknown shelf "${shelf}".`);
+    if (shelf === 'pinned') return { pinned: true };
+    if (shelf === 'unopened') return { unopenedDays: UNOPENED_DAYS };
+    return { intent: shelf };
   };
 
   const inbox = () => memory().items.list({ inbox: true }, 200).filter((item) => NON_TASK(item.type));
@@ -86,6 +82,7 @@ export function createHandlers(ctx: HandlerContext): Handlers {
       baseUrl: settings.aiBaseUrl,
       enrich: settings.aiEnrich,
       enrichSince: settings.aiEnrichSince,
+      autoApply: settings.aiAutoApply,
       providers: Object.entries(PROVIDERS).map(([id, info]) => ({
         id, label: info.label, baseUrl: info.baseUrl, needsKey: info.needsKey, defaultModel: info.defaultModel ?? null, cloud: CLOUD_PROVIDERS.has(id),
       })),
@@ -105,7 +102,7 @@ export function createHandlers(ctx: HandlerContext): Handlers {
       folder: memory().settings.get('syncFolder'),
       encrypted: memory().sync.encrypted,
       running: library.syncRunning,
-      needsPassphrase: Boolean(last?.error && /Enter its passphrase/i.test(last.error)),
+      needsPassphrase: last?.code === 'locked',
       last,
     };
   };
@@ -159,12 +156,12 @@ export function createHandlers(ctx: HandlerContext): Handlers {
       return prefsView();
     },
 
-    'items.list': (filter, limit) => withTags(memory().items.list(filter, limit)),
+    'items.list': (filter, limit) => memory().items.list(filter, limit),
     'items.page': (filter, cursor, limit) => {
       const items = memory().items.list({ ...filter, before: cursor ?? undefined }, limit);
-      return { items: withTags(items), next: items.length === limit ? pageCursor(items[items.length - 1]!) : null };
+      return { items, next: items.length === limit ? pageCursor(items[items.length - 1]!) : null };
     },
-    'items.inbox': () => withTags(inbox()),
+    'items.inbox': inbox,
     'items.get': (id) => memory().items.get(id),
     'items.saveNote': (input) => memory().items.saveNote(input),
     'items.saveLink': (input) => memory().items.saveLink(input),
@@ -186,6 +183,33 @@ export function createHandlers(ctx: HandlerContext): Handlers {
       writeFileSync(target, data);
       const error = await shell.openPath(target);
       if (error) throw new DesktopError('open_failed', error);
+      memory().items.markOpened(id);
+    },
+    'items.openUrl': async (id) => {
+      const item = memory().items.get(id);
+      if (!item.url || !/^https?:/i.test(item.url)) throw new DesktopError('invalid', 'This item has no web link to open.');
+      await shell.openExternal(item.url);
+      memory().items.markOpened(id);
+    },
+    'items.pin': (id, pinned) => memory().items.pin(id, Boolean(pinned)),
+    'items.setReminder': (id, when) => memory().items.setReminder(id, when),
+    'items.setIntent': (id, intent) => memory().items.setIntent(id, intent),
+    'shelves.counts': () => {
+      const items = memory().items;
+      const count = (filter: ItemFilter) => items.list(filter, 200).length;
+      const reminders = items.list({ reminders: true }, 200);
+      const now = new Date().toISOString();
+      return {
+        ...(Object.fromEntries(SHELVES.map((shelf) => [shelf, count(shelfFilter(shelf))])) as Record<Shelf, number>),
+        reminders: reminders.length,
+        due: reminders.filter((item) => item.remindAt! <= now).length,
+      };
+    },
+    'shelves.list': (shelf) => memory().items.list(shelfFilter(shelf), 200),
+    'reminders.list': () => {
+      const now = new Date().toISOString();
+      const all = memory().items.list({ reminders: true }, 200);
+      return { due: all.filter((item) => item.remindAt! <= now), upcoming: all.filter((item) => item.remindAt! > now) };
     },
     'files.save': (paths, project) => {
       if (!Array.isArray(paths) || paths.length === 0) throw new DesktopError('invalid', 'Drop at least one file.');
@@ -269,6 +293,10 @@ export function createHandlers(ctx: HandlerContext): Handlers {
         settings.set('aiEnrichSince', new Date().toISOString());
       }
       settings.set('aiEnrich', Boolean(on));
+      return aiStatus();
+    },
+    'ai.setAutoApply': (on) => {
+      memory().settings.set('aiAutoApply', Boolean(on));
       return aiStatus();
     },
     'ai.ask': (question, project) => ask(memory(), requireProvider(), str(question, 'Question'), project ? { project } : {}),

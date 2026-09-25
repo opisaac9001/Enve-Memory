@@ -36,6 +36,11 @@ export function onCommand(listener: (command: Command | 'capture-focus') => void
   return window.enve.on('command', (command) => listener(command as Command));
 }
 
+/** A notification (or another window) asked to show an item. */
+export function onOpenItem(listener: (id: string) => void): () => void {
+  return window.enve.on('open', (id) => listener(id as string));
+}
+
 export interface Live<T> {
   data: T | undefined;
   error: CallFailed | null;

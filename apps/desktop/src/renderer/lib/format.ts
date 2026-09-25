@@ -1,13 +1,6 @@
-import type { ItemType } from '@enve-memory/core';
+import type { Intent, ItemType } from '@enve-memory/core';
 
-export function firstLine(text: string, max = 120): string {
-  const line = text.split('\n').map((l) => l.replace(/^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+\.\s+)/, '').trim()).find(Boolean) ?? '';
-  return line.length > max ? `${line.slice(0, max - 1)}…` : line;
-}
-
-export function displayTitle(item: { title: string; body?: string; url?: string | null; type?: string }): string {
-  return item.title || firstLine(item.body ?? '') || item.url || 'Untitled';
-}
+export { displayTitle, firstLine } from '../../shared/text.ts';
 
 export function siteOf(url: string | null | undefined): string {
   if (!url) return '';
@@ -109,4 +102,19 @@ export function snippetParts(snippet: string): { text: string; match: boolean }[
   }
   if (last < snippet.length) parts.push({ text: snippet.slice(last), match: false });
   return parts;
+}
+
+export const INTENT_LABELS: Record<Intent, string> = { read: 'Read', watch: 'Watch', buy: 'Buy', revisit: 'Revisit' };
+
+/** "Tonight 8:00 PM", "Tomorrow 9:00 AM", "Sat 10:00 AM", "Oct 3, 9:00 AM". */
+export function formatReminder(iso: string, now = new Date()): string {
+  const date = new Date(iso);
+  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(date) - day(now)) / 86_400_000);
+  if (days === 0) return `${date.getHours() >= 17 ? 'Tonight' : 'Today'} ${time}`;
+  if (days === 1) return `Tomorrow ${time}`;
+  if (days === -1) return `Yesterday ${time}`;
+  if (days > 1 && days < 7) return `${date.toLocaleDateString(undefined, { weekday: 'short' })} ${time}`;
+  return `${formatDate(iso, now.getTime())}, ${time}`;
 }

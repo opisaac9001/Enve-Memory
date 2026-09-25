@@ -419,8 +419,17 @@ mark {
   display: flex;
   flex-direction: column;
   padding: 0 12px 12px;
-  overflow-y: auto;
+  overflow: hidden;
   min-height: 0;
+}
+
+.sidebar nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -12px;
+  padding: 0 12px 8px;
+  scrollbar-width: thin;
 }
 
 .sidebar-top {
@@ -515,8 +524,8 @@ mark {
 }
 
 .sidebar-bottom {
-  margin-top: auto;
-  padding-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
 }
 
 .main {
@@ -2433,4 +2442,110 @@ input.item-heading:hover {
 .dot.project {
   background: var(--text);
   box-shadow: 0 0 0 2px var(--ember);
+}
+
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+
+.button.on,
+.icon-button.on {
+  color: var(--ember-text);
+}
+
+.button.on {
+  background: var(--ember-soft);
+  border-color: var(--ember-line);
+}
+
+.row-quick {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.item-row:hover .row-quick,
+.row-quick:focus-within,
+.row-quick:has([aria-expanded='true']) {
+  opacity: 1;
+}
+
+.row-quick .icon-button:not(.on) {
+  color: var(--text-3);
+}
+
+.meta-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--ember-text);
+}
+
+.intent-chip {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.menu-root {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+}
+
+.item-actions .menu {
+  left: 0;
+  right: auto;
+}
+
+.menu > button {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.menu > button:hover {
+  background: var(--surface-2);
+}
+
+.menu .danger-item {
+  color: var(--danger);
+}
+
+.menu-picker {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+}
+
+.menu-picker input {
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.reminder-entry .row-actions {
+  gap: 8px;
 }
