@@ -24,9 +24,10 @@ export function hitLine(hit: SearchHit): string {
   const project = hit.project ? `  (${hit.project.name})` : '';
   const status = hit.taskStatus ? ` [${hit.taskStatus}]` : '';
   const heading = hit.title || hit.url;
+  const via = hit.match === 'semantic' ? '  ~' : '';
   const lines = heading
-    ? [`${hit.type}${status}: ${oneLine(heading)}${project}`, `    ${oneLine(hit.snippet, 120)}`]
-    : [`${hit.type}${status}: ${oneLine(hit.snippet, 120)}${project}`];
+    ? [`${hit.type}${status}: ${oneLine(heading)}${project}${via}`, `    ${oneLine(hit.snippet, 120)}`]
+    : [`${hit.type}${status}: ${oneLine(hit.snippet, 120)}${project}${via}`];
   return [...lines, `    ${hit.id}`].join('\n');
 }
 

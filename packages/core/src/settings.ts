@@ -5,9 +5,11 @@ import { invalid } from './errors.ts';
 export interface Settings {
   /** Fetch saved links to archive their readable text. Off means no network requests at all on save. */
   fetchLinks: boolean;
+  /** Index items with the local embedding model so search matches meaning, not just words. */
+  semanticSearch: boolean;
 }
 
-const DEFAULTS: Settings = { fetchLinks: true };
+const DEFAULTS: Settings = { fetchLinks: true, semanticSearch: true };
 
 export class SettingsService {
   private readonly ctx: Context;

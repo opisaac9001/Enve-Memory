@@ -85,7 +85,10 @@ export class ItemService {
     return this.get(this.insert({ type: 'note', body, title: input.title, project: input.project, tags: input.tags }));
   }
 
-  /** Saving a URL that is already bookmarked returns the existing bookmark, appending any new note and adding any new tags. */
+  /**
+   * Saving a URL that is already bookmarked returns the existing bookmark, appending any new note, adding any new tags,
+   * and filing it into the given project if it has none. It never moves a bookmark out of a project it's already in.
+   */
   saveLink(input: SaveLinkInput): { item: ItemDetail; created: boolean } {
     const url = parseUrl(input.url);
     const existing = this.findByUrl(url);
@@ -97,6 +100,9 @@ export class ItemService {
           if (!row.body.includes(note)) this.write(row, { body: row.body ? `${row.body}\n\n${note}` : note }, 'update');
         }
         if (input.tags?.length) this.tag(existing.id, { add: input.tags });
+        if (input.project && !existing.project) {
+          this.write(this.row(existing.id), { project_id: this.projects.resolve(input.project).id }, 'update');
+        }
       });
       return { item: this.get(existing.id), created: false };
     }

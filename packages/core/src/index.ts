@@ -4,6 +4,7 @@ export { defaultHome, pathsFor, type MemoryPaths } from './paths.ts';
 export { migrate, openDatabase, schemaVersion, transaction } from './db.ts';
 export { MIGRATIONS, type Migration } from './migrations.ts';
 export { toFtsQuery } from './search.ts';
+export { type Embedder, type VectorHit, chunkText } from './embeddings.ts';
 export { MAX_LIMIT } from './items.ts';
 export type { ItemFilter, SaveLinkInput, SaveNoteInput, SourceUpdate, UpdateItemInput } from './items.ts';
 export { EXTRACTABLE_TYPES, type SaveFileInput } from './files.ts';
@@ -12,4 +13,5 @@ export type { CreateTaskInput, TaskListStatus, UpdateTaskInput } from './tasks.t
 export type { CreateProjectInput, UpdateProjectInput } from './projects.ts';
 export type { RecordDecisionInput } from './decisions.ts';
 export type { Settings } from './settings.ts';
+export { DrainWorker } from './worker.ts';
 export * from './types.ts';

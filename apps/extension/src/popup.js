@@ -43,7 +43,7 @@ async function init() {
 
   $('title').value = tab.title ?? '';
   const bookmarkable = isCapturableUrl(tab.url);
-  $('url').textContent = bookmarkable ? tab.url : "This page can't be bookmarked, so it will be saved as a note.";
+  $('url').textContent = bookmarkable ? tab.url : 'Not a web page, so this saves as a note.';
   $('url').title = tab.url ?? '';
 
   $('note').focus();
@@ -90,7 +90,8 @@ function wireForm() {
   const input = $('tag-input');
   $('chips').addEventListener('click', (event) => event.target === event.currentTarget && input.focus());
   input.addEventListener('keydown', (event) => {
-    if ((event.key === 'Enter' && input.value.trim() && !event.metaKey && !event.ctrlKey) || event.key === ',') {
+    // Plain Enter only commits a tag; saving from here takes Cmd/Ctrl+Enter, so a stray Enter can't save early.
+    if ((event.key === 'Enter' && !event.metaKey && !event.ctrlKey) || event.key === ',') {
       event.preventDefault();
       commitTags();
     } else if (event.key === 'Backspace' && !input.value && tags.length) {

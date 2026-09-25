@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type ParseArgsConfig, parseArgs } from 'node:util';
 import { EnveMemory, MemoryError, type Settings } from '@enve-memory/core';
+import { attachLocalEmbedder, indexWorker } from '@enve-memory/embeddings';
 import { ingestItem, processPending } from '@enve-memory/ingestion';
 import { DEFAULT_PORT, createApiServer, lanUrls, pairingLink } from '@enve-memory/api';
 import { SERVER_NAME, serveMemoryOverStdio } from '@enve-memory/mcp';
@@ -58,7 +59,8 @@ AI clients and devices
 
 Other
   ingest                       Fetch and extract anything still pending  [--retry] also retries failures
-  settings [key] [value]       Show or change settings (fetchLinks true|false)
+  index                        Build the semantic search index (downloads a ~23 MB model once)
+  settings [key] [value]       Show or change settings (fetchLinks, semanticSearch: true|false)
   info                         Library location and stats
 
 Global options: --home DIR (default $ENVE_MEMORY_HOME or the platform data folder), --json, -h, -v`;
@@ -173,6 +175,20 @@ async function run(memory: EnveMemory): Promise<void> {
       openExternal(target);
       return emit({ opened: target }, `Opened ${target}`);
     }
+    case 'index': {
+      const embedder = attachLocalEmbedder(memory);
+      if (!embedder) throw new UsageError('Semantic search is off. Turn it on with `enve-memory settings semanticSearch true`.');
+      let total = 0;
+      const { pending } = memory.embeddings.status(embedder.model);
+      if (pending && !opts.json) process.stderr.write(`Indexing ${pending} item${pending === 1 ? '' : 's'} with ${embedder.model}…\n`);
+      for (let batch = await memory.embeddings.indexPending(embedder, 25); batch > 0; batch = await memory.embeddings.indexPending(embedder, 25)) {
+        total += batch;
+        if (!opts.json) process.stderr.write(`  ${total}/${pending}\r`);
+      }
+      if (total && !opts.json) process.stderr.write('\n');
+      const status = memory.embeddings.status(embedder.model);
+      return emit({ added: total, ...status }, `${total ? `Indexed ${total}. ` : ''}${status.indexed} items, ${status.chunks} passages in the semantic index.`);
+    }
     case 'ingest': {
       const retried = opts.retry ? memory.items.retryFailedIngest() : 0;
       const processed = await processPending(memory, { limit: 200 });
@@ -188,7 +204,8 @@ async function run(memory: EnveMemory): Promise<void> {
       return emit(settings, Object.entries(settings).map(([k, v]) => `${k.padEnd(14)}${v}`).join('\n'));
     }
     case 'search': {
-      const hits = memory.search.query(text(0, 'query'), filter(), limit());
+      attachLocalEmbedder(memory);
+      const hits = await memory.search.hybrid(text(0, 'query'), filter(), limit());
       return emit(hits, hits.length ? hits.map(format.hitLine).join('\n') : 'No matches.');
     }
     case 'list': {
@@ -249,6 +266,12 @@ async function run(memory: EnveMemory): Promise<void> {
         schemaVersion: memory.schemaVersion,
         deviceId: memory.deviceId,
         ...memory.stats(),
+        semanticIndex: (() => {
+          const embedder = attachLocalEmbedder(memory);
+          if (!embedder) return 'off';
+          const { indexed, pending } = memory.embeddings.status(embedder.model);
+          return `${indexed} indexed, ${pending} pending (${embedder.model})`;
+        })(),
       };
       return emit(info, Object.entries(info).map(([k, v]) => `${k.padEnd(14)}${v}`).join('\n'));
     }
@@ -291,11 +314,16 @@ async function serve(): Promise<void> {
   const memory = EnveMemory.open({ home: opts.home, actor: 'api' });
   const port = opts.port === undefined ? DEFAULT_PORT : Number(opts.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new UsageError(`Invalid port "${opts.port}".`);
-  const api = createApiServer(memory, { version: pkg.version, port, lan: opts.lan });
+  const embedder = attachLocalEmbedder(memory);
+  const indexer = embedder ? indexWorker(memory, embedder) : null;
+  const api = createApiServer(memory, { version: pkg.version, port, lan: opts.lan, afterWrite: () => indexer?.kick() });
   const url = await api.listen();
+  api.ingest.kick();
+  indexer?.kick();
   console.error(`Enve Memory API listening on ${url}${opts.lan ? ' (also reachable from your network)' : ''}\nREST: ${url}/api/v1   MCP: ${url}/mcp`);
   const stop = async () => {
     await api.close();
+    await indexer?.idle();
     memory.close();
     process.exit(0);
   };

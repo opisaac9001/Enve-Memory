@@ -84,6 +84,7 @@ test('a capture-only client can save but not read or edit', async () => {
   assert.equal(again.data.created, false);
   assert.match(again.data.item.body, /Check wiring diagram$/);
 
+  assert.equal((await call('GET', '/api/v1/whoami', extension)).data.name, 'Chrome extension');
   const denied = await call('GET', '/api/v1/search?q=ratgdo', extension);
   assert.equal(denied.status, 403);
   assert.equal(denied.data.error.code, 'insufficient_scope');

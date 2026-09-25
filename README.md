@@ -4,7 +4,7 @@
 
 Save links, notes, tasks and decisions once. Find them yourself, or let Claude, Codex, Cursor or any other MCP client find and use them. Every assistant reads and writes the same library, and that library is a single SQLite file on your computer. No account, no subscription, no cloud.
 
-> Status: early. The core, the CLI and the MCP server work. The desktop app, the browser extension and semantic search are next. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: early. The core, CLI, MCP server, local HTTP API, link archiving, semantic search and the browser extension work. The desktop app is next. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Try it
 

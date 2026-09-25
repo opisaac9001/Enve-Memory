@@ -6,7 +6,9 @@ const open = () => EnveMemory.open({ inMemory: true, actor: 'test' });
 
 test('free text is quoted so FTS syntax in user input is inert', () => {
   assert.equal(toFtsQuery('ESP32 garage'), '"esp32" OR "garage"*');
-  assert.equal(toFtsQuery('"a" NEAR(b) -c OR d*'), '"a" OR "near" OR "b" OR "c" OR "or" OR "d"*');
+  assert.equal(toFtsQuery('"x" NEAR(b) -c OR d*'), '"x" OR "near" OR "b" OR "c" OR "d"*');
+  assert.equal(toFtsQuery('how does the opener work'), '"opener" OR "work"*');
+  assert.equal(toFtsQuery('to be or'), '"to" OR "be" OR "or"*');
   assert.equal(toFtsQuery('  ?!  '), null);
 });
 

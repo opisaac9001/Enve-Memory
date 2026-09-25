@@ -5,6 +5,7 @@ import { FileService } from './files.ts';
 import { Context } from './context.ts';
 import { IN_MEMORY, openDatabase, schemaVersion } from './db.ts';
 import { DecisionService } from './decisions.ts';
+import { EmbeddingService } from './embeddings.ts';
 import { ItemService } from './items.ts';
 import { type MemoryPaths, defaultHome, pathsFor } from './paths.ts';
 import { ProjectService } from './projects.ts';
@@ -30,6 +31,7 @@ export class EnveMemory {
   readonly items: ItemService;
   readonly tasks: TaskService;
   readonly decisions: DecisionService;
+  readonly embeddings: EmbeddingService;
   readonly search: SearchService;
   readonly activity: ActivityService;
   readonly clients: ClientService;
@@ -52,7 +54,8 @@ export class EnveMemory {
     this.items = new ItemService(this.ctx, this.projects, this.settings);
     this.tasks = new TaskService(this.ctx, this.items, this.projects);
     this.decisions = new DecisionService(this.ctx, this.items, this.projects);
-    this.search = new SearchService(this.ctx, this.items);
+    this.embeddings = new EmbeddingService(this.ctx);
+    this.search = new SearchService(this.ctx, this.items, this.embeddings);
     this.activity = new ActivityService(this.ctx, this.projects);
     this.clients = new ClientService(this.ctx);
     this.files = new FileService(this.ctx, this.items);

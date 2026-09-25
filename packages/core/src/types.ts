@@ -130,6 +130,8 @@ export interface SearchHit {
   url: string | null;
   project: ProjectRef | null;
   snippet: string;
+  /** Which search found it: exact terms, meaning, or both. */
+  match: 'keyword' | 'semantic' | 'both';
   taskStatus: TaskStatus | null;
   updatedAt: string;
 }

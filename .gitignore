@@ -5,3 +5,4 @@ dist/
 *.sqlite-shm
 .DS_Store
 CLAUDE.local.md
+.cache/

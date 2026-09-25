@@ -1,8 +1,8 @@
 import { createReadStream } from 'node:fs';
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { type ApiClient, type ClientScope, type EnveMemory, MemoryError } from '@enve-memory/core';
-import { IngestWorker } from '@enve-memory/ingestion';
+import { type ApiClient, type ClientScope, DrainWorker, type EnveMemory, MemoryError } from '@enve-memory/core';
+import { processPending } from '@enve-memory/ingestion';
 import { createServer as createMcpServer } from '@enve-memory/mcp';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { type AuthInfo, createMcpHandler } from '@modelcontextprotocol/server';
@@ -21,11 +21,13 @@ export interface ApiServerOptions {
   port?: number;
   /** Accept connections from other devices (phone, Tailscale). Tokens are still required. */
   lan?: boolean;
+  /** Called after every write and every finished ingestion pass, e.g. to kick the embedding indexer. */
+  afterWrite?: () => void;
 }
 
 export interface ApiServer {
   readonly server: Server;
-  readonly ingest: IngestWorker;
+  readonly ingest: DrainWorker;
   listen(): Promise<string>;
   close(): Promise<void>;
 }
@@ -33,7 +35,11 @@ export interface ApiServer {
 const STATUS_FOR: Record<MemoryError['code'], number> = { not_found: 404, invalid: 400, conflict: 409, schema: 500 };
 
 export function createApiServer(memory: EnveMemory, options: ApiServerOptions): ApiServer {
-  const ingest = new IngestWorker(memory);
+  const ingest = new DrainWorker('ingest', () => processPending(memory), options.afterWrite);
+  const changed = () => {
+    ingest.kick();
+    options.afterWrite?.();
+  };
   const mcp = createMcpHandler((ctx) => {
     const auth = ctx.authInfo!;
     return createMcpServer(memory, options.version, {
@@ -85,7 +91,7 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
           project: header(req, 'x-project'),
           tags: header(req, 'x-tags')?.split(',').map((t) => t.trim()).filter(Boolean),
         });
-        ingest.kick();
+        changed();
         return send(res, 201, result);
       }
       const download = /^\/api\/v1\/items\/([^/]+)\/file$/.exec(url.pathname);
@@ -104,11 +110,11 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
 
       const match = matchRoute(req.method ?? 'GET', url.pathname);
       if (!match) throw new HttpError(404, 'not_found', `No route for ${req.method} ${url.pathname}.`);
-      requireScope(client, match.route.scope);
+      if (match.route.scope) requireScope(client, match.route.scope);
       const body = req.method === 'GET' ? undefined : await readJson(req);
       memory.actor = `api:${client.name}`;
       const result = match.route.handle({ memory, client, params: match.params, query: url.searchParams, body });
-      if (req.method !== 'GET') ingest.kick();
+      if (req.method !== 'GET') changed();
       send(res, match.route.status ?? 200, result);
     } catch (error) {
       sendError(res, error);

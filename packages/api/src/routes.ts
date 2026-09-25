@@ -12,7 +12,8 @@ export interface RouteContext {
 export interface Route {
   method: string;
   pattern: RegExp;
-  scope: ClientScope;
+  /** null: any valid token, e.g. so a capture-only client can confirm it's connected. */
+  scope: ClientScope | null;
   status?: number;
   handle: (ctx: RouteContext) => unknown;
 }
@@ -59,7 +60,7 @@ function captureNote(note: string | undefined, selection: string | undefined): s
 }
 
 export const routes: Route[] = [
-  { method: 'GET', pattern: path('/whoami'), scope: 'read', handle: ({ client }) => client },
+  { method: 'GET', pattern: path('/whoami'), scope: null, handle: ({ client }) => client },
 
   {
     method: 'GET', pattern: path('/search'), scope: 'read',

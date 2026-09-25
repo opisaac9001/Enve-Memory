@@ -59,6 +59,11 @@ body {
   font-size: 12px;
 }
 
+.label-hint {
+  color: var(--text-3);
+  font-weight: 400;
+}
+
 .url {
   margin-top: -8px;
   color: var(--text-3);

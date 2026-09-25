@@ -7,13 +7,15 @@ import { promisify } from 'node:util';
 
 const CLI = fileURLToPath(new URL('../../../../packages/cli/src/main.ts', import.meta.url));
 
-/** Runs a real `enve-memory serve` on a free port against a throwaway library. */
+/** Runs a real `enve-memory serve` on a free port against a throwaway library, with link fetching off. */
 export async function startScratchServer() {
   const home = await mkdtemp(join(tmpdir(), 'enve-memory-ext-'));
   const cli = async (...args) => {
     const { stdout } = await promisify(execFile)(process.execPath, [CLI, '--home', home, '--json', ...args]);
     return JSON.parse(stdout);
   };
+  // Keeps tests offline: the server would otherwise fetch every captured URL to archive it.
+  await cli('settings', 'fetchLinks', 'false');
   const server = spawn(process.execPath, [CLI, '--home', home, 'serve', '--port', '0'], { stdio: ['ignore', 'ignore', 'pipe'] });
   const url = await new Promise((resolve, reject) => {
     let output = '';

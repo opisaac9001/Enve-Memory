@@ -127,7 +127,7 @@ export function createServer(memory: EnveMemory, version: string, access: Server
 
   tool('search', 'read', {
     title: 'Search memory',
-    description: 'Full-text search across everything saved: notes, links, tasks and decisions. Returns ranked hits with a highlighted snippet; use get_item for full text.',
+    description: 'Search everything saved (notes, links and their archived text, files, tasks, decisions) by keywords and by meaning. Each hit says whether it matched on keywords, meaning or both, with a snippet; use get_item for full text.',
     inputSchema: z.object({
       query: z.string().describe('Words to look for'),
       project: project.optional(),
@@ -137,7 +137,7 @@ export function createServer(memory: EnveMemory, version: string, access: Server
       limit: limit.optional().describe('Default 20'),
     }),
     annotations: READ,
-  }, (a) => memory.search.query(a.query, { project: a.project, type: a.type, tag: a.tag, includeArchived: a.include_archived }, a.limit));
+  }, (a) => memory.search.hybrid(a.query, { project: a.project, type: a.type, tag: a.tag, includeArchived: a.include_archived }, a.limit));
 
   tool('get_item', 'read', {
     title: 'Get item',

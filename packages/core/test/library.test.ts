@@ -83,6 +83,11 @@ test('saving an already-bookmarked URL returns the original and merges notes and
   const third = memory.items.saveLink({ url: 'https://example.com/security-plus', note: 'Section 4' });
   assert.equal(third.item.body, 'Rolling codes\n\nSection 4');
   assert.equal(memory.items.saveLink({ url: 'https://example.com/security-plus', note: 'Section 4' }).item.body, third.item.body);
+
+  memory.projects.create({ name: 'Garage' });
+  memory.projects.create({ name: 'Plex' });
+  assert.equal(memory.items.saveLink({ url: 'https://example.com/security-plus', project: 'garage' }).item.project?.name, 'Garage');
+  assert.equal(memory.items.saveLink({ url: 'https://example.com/security-plus', project: 'plex' }).item.project?.name, 'Garage');
   assert.throws(() => memory.items.saveLink({ url: 'not a url' }), failsWith('invalid'));
 });
 

@@ -19,7 +19,7 @@ Two transports:
 
 | Tool | Scope | Purpose |
 |---|---|---|
-| `search` | read | Full-text search with project / type / tag filters; ranked hits with highlighted snippets |
+| `search` | read | Hybrid keyword + meaning search with project / type / tag filters; each hit says whether it matched on `keyword`, `semantic` or `both` |
 | `get_item` | read | Full item with tags, task fields, relations, attachments and archived `content` (paged 20k characters at a time via `content_offset`) |
 | `list_items` | read | Recent items, filterable; bodies trimmed to a 280-char preview |
 | `list_projects` | read | Projects (archived ones hidden by default) |

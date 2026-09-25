@@ -169,4 +169,31 @@ export const MIGRATIONS: readonly Migration[] = [
       INSERT INTO items_fts(items_fts) VALUES ('rebuild');
     `,
   },
+  {
+    name: 'embeddings',
+    sql: `
+      -- Derived and rebuildable from items, so not in the change log and never synced.
+      CREATE TABLE chunks (
+        id INTEGER PRIMARY KEY,
+        item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        model TEXT NOT NULL,
+        ordinal INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        vector BLOB NOT NULL,
+        UNIQUE (item_id, model, ordinal)
+      ) STRICT;
+      CREATE INDEX chunks_model ON chunks(model, id);
+
+      CREATE TABLE embedded_items (
+        item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        model TEXT NOT NULL,
+        embedded_at TEXT NOT NULL,
+        PRIMARY KEY (item_id, model)
+      ) STRICT;
+
+      CREATE TRIGGER items_embedding_stale AFTER UPDATE OF title, body, content ON items BEGIN
+        DELETE FROM embedded_items WHERE item_id = new.id;
+      END;
+    `,
+  },
 ];

@@ -58,6 +58,10 @@ changes(seq, id, device_id, actor, entity, entity_id, op, project_id, data, at)
 
 `body` is what the user (or their agent) wrote: a note, or why a link matters. `content` is what came from the source: a page's readable Markdown, a PDF's text, a text file. Keeping them apart lets search rank the user's words higher, lets exports and UIs label source text as quoted material, and keeps extracted text from ever looking like the user's instructions.
 
+## Derived data
+
+`chunks` (item, model, ordinal, text, float32 vector) and `embedded_items` (which items are current for which model) are rebuildable from `items`. They aren't in the change log and are never synced. The `items_embedding_stale` trigger deletes an item's `embedded_items` row whenever its title, body or content changes.
+
 ## Coming later
 
-`content_chunks` + `embeddings`, `reminders`, and per-type metadata as needed.
+`reminders`, and per-type metadata as needed.

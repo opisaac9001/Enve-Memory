@@ -23,6 +23,7 @@
 | `packages/core` | Schema and migrations, services (projects, items, tasks, decisions, search, activity), and the `EnveMemory` facade. No dependencies. |
 | `packages/mcp` | MCP tool definitions over core, using the official TypeScript SDK v2 (`@modelcontextprotocol/server`, spec 2026-07-28). Thin: argument shaping and output trimming only. |
 | `packages/ingestion` | Fetch (no cookies, time/size caps), readable-article extraction (Readability + linkedom → Markdown via Turndown), PDF text (unpdf), and `IngestWorker` for background draining. |
+| `packages/embeddings` | `LocalEmbedder` (transformers.js), `attachLocalEmbedder`, and the background `indexWorker`. |
 | `packages/api` | Local HTTP server: REST (`/api/v1`) + MCP over Streamable HTTP (`/mcp`), with token auth, scopes and Host/Origin guards. |
 | `packages/cli` | The `enve-memory` binary: human and `--json` commands, `mcp` (stdio), `serve` (HTTP), `clients` (tokens) and `connect` (client setup snippets). |
 
@@ -58,9 +59,10 @@ SQLite runs in WAL mode with a 5 s busy timeout. The desktop app, a CLI invocati
 
 ## Search
 
-- **Now:** SQLite FTS5 over `title`, `body` and `url`, with the porter stemmer and unicode61 tokenizer with diacritics removed. Ranking is bm25 with column weights 10 / 1 / 2. User text is tokenized and every term quoted, so FTS syntax in input is inert. Terms are OR'd so partial matches still surface, and the last term is a prefix match.
-- **Phase 3:** local embeddings, chunked content, and a `VectorIndex` interface (`add / update / remove / search / rebuild`). The first implementation will be sqlite-vec. It's pre-1.0, which is why it sits behind our own abstraction.
-- **Hybrid:** combine vector, keyword, project and recency scores. The weights will be tuned against a fixture corpus, not guessed.
+- **Keyword:** SQLite FTS5 over `title`, `body`, `url` and `content`, with the porter stemmer and unicode61 tokenizer with diacritics removed. Ranking is bm25 with column weights 10 / 1.5 / 2 / 1. User text is tokenized, stopwords are dropped (unless they're the whole query), and every term is quoted so FTS syntax is inert. Terms are OR'd so partial matches still surface, and the last term is a prefix match.
+- **Meaning:** items are chunked (≈1000 characters, 200 overlap, at most 48 per item) and embedded by an `Embedder`. The default is `LocalEmbedder`: all-MiniLM-L6-v2 through transformers.js and onnxruntime-node, int8, about 23 MB, downloaded once into `<home>/models`. Vectors live in `chunks` as float32 blobs and are searched brute-force in memory. That's fast enough for a personal library, and it avoids depending on pre-1.0 sqlite-vec. A trigger marks an item stale whenever its text changes, and the in-memory index reloads when another process writes vectors.
+- **Hybrid:** reciprocal rank fusion (k = 60) of the two lists. Vector hits below the model's `minScore` (0.18 for MiniLM) are dropped, so an unrelated query returns nothing rather than the least-bad items. We chose MiniLM over bge-small because bge packs every score into 0.4–0.7, which makes a relevance floor impossible. `packages/embeddings/test/retrieval.test.ts` is the fixture eval: hybrid gets 5 of 6 paraphrased questions right at #1, keyword alone gets 1 of 6.
+- Semantic search is on by default (`semanticSearch` setting). `serve` and the desktop app index in the background; `enve-memory index` does it on demand.
 
 ## Ingestion
 

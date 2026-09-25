@@ -6,6 +6,7 @@ export interface MemoryPaths {
   database: string;
   backups: string;
   attachments: string;
+  models: string;
 }
 
 /** Matches Electron's `app.getPath('userData')` for "Enve Memory" so the CLI and desktop app share one library. */
@@ -22,5 +23,5 @@ export function defaultHome(env: NodeJS.ProcessEnv = process.env, platform: Node
 }
 
 export function pathsFor(home: string): MemoryPaths {
-  return { home, database: join(home, 'memory.sqlite'), backups: join(home, 'backups'), attachments: join(home, 'attachments') };
+  return { home, database: join(home, 'memory.sqlite'), backups: join(home, 'backups'), attachments: join(home, 'attachments'), models: join(home, 'models') };
 }

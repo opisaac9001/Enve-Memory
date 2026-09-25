@@ -12,11 +12,17 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test --test-reporter=dot \"packages/*/test/*.test.ts\"",
-    "check": "npm run typecheck && npm test",
-    "cli": "node packages/cli/src/main.ts"
+    "check": "npm run typecheck && npm test && npm run test:extension",
+    "cli": "node packages/cli/src/main.ts",
+    "test:extension": "npm --prefix apps/extension test",
+    "models": "node -e \"import('@enve-memory/embeddings').then(async ({ LocalEmbedder }) => { await new LocalEmbedder('.cache/models').embed(['warm up'], 'query'); console.log('Model cached in .cache/models'); })\""
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
     "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "onnxruntime-node": false,
+    "protobufjs": false
   }
 }
