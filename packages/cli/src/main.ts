@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { type ParseArgsConfig, parseArgs } from 'node:util';
 import { EnveMemory, MemoryError } from '@enve-memory/core';
-import { DEFAULT_PORT, createApiServer } from '@enve-memory/api';
+import { DEFAULT_PORT, createApiServer, lanUrls, pairingLink } from '@enve-memory/api';
 import { SERVER_NAME, serveMemoryOverStdio } from '@enve-memory/mcp';
 import pkg from '../package.json' with { type: 'json' };
 import * as format from './format.ts';
@@ -46,6 +46,7 @@ AI clients and devices
   connect                      Print setup for Claude Code, Codex and other MCP clients
   serve                        Run the local HTTP API + MCP-over-HTTP  [--port 49231] [--lan]
   clients add <name>           Create an API token   --scope read|capture|write (repeat or comma-separate)
+  clients pair <device>        Create a read+write token for a phone and print its pairing link  [--port]
   clients list                 List API clients
   clients revoke <id>          Revoke a token immediately
 
@@ -212,6 +213,15 @@ function runClients(memory: EnveMemory): void {
       const scopes = (opts.scope ?? []).flatMap((s) => s.split(',')).map((s) => s.trim()).filter(Boolean);
       const { client, token } = memory.clients.create(text(1, 'name'), scopes);
       return emit({ client, token }, `Created ${client.name} (${client.scopes.join(', ')})\n\n  ${token}\n\nThis token is shown once. Store it in the client now.`);
+    }
+    case 'pair': {
+      const { client, token } = memory.clients.create(text(1, 'device'), ['read', 'write']);
+      const port = opts.port === undefined ? DEFAULT_PORT : Number(opts.port);
+      const links = lanUrls(port).map((url) => pairingLink(url, token, client.name));
+      return emit(
+        { client, token, links },
+        `Paired ${client.name}. Start the server with \`enve-memory serve --lan\`, then open one of these on the device:\n\n${links.map((l) => `  ${l}`).join('\n') || '  (no network address found; connect to Wi-Fi or Tailscale)'}\n\nThe link contains the token and is shown once.`,
+      );
     }
     case 'list': {
       const clients = memory.clients.list();

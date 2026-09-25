@@ -72,9 +72,7 @@ export class ItemService {
   /** Saving a URL that is already bookmarked returns the existing bookmark, appending any new note and adding any new tags. */
   saveLink(input: SaveLinkInput): { item: ItemDetail; created: boolean } {
     const url = parseUrl(input.url);
-    const existing = this.ctx.get<{ id: string }>(
-      `SELECT id FROM items WHERE type = 'bookmark' AND url = ? AND archived_at IS NULL ORDER BY seq LIMIT 1`, url,
-    );
+    const existing = this.findByUrl(url);
     if (existing) {
       this.ctx.tx(() => {
         const note = input.note?.trim();
@@ -90,6 +88,14 @@ export class ItemService {
       type: 'bookmark', url, title: input.title, body: input.note, project: input.project, tags: input.tags,
     });
     return { item: this.get(id), created: true };
+  }
+
+  /** The active bookmark for a URL, if one exists. */
+  findByUrl(url: string): ItemDetail | null {
+    const row = this.ctx.get<{ id: string }>(
+      `SELECT id FROM items WHERE type = 'bookmark' AND url = ? AND archived_at IS NULL ORDER BY seq LIMIT 1`, parseUrl(url),
+    );
+    return row ? this.get(row.id) : null;
   }
 
   /** Low-level create shared by the typed services. Returns the new item's id. */

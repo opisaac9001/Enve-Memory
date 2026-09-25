@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
 import { after, test } from 'node:test';
-import { createApiServer } from '@enve-memory/api';
+import { createApiServer, pairingLink } from '@enve-memory/api';
 import { EnveMemory } from '@enve-memory/core';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 
@@ -88,6 +88,10 @@ test('a capture-only client can save but not read or edit', async () => {
   assert.equal(denied.data.error.code, 'insufficient_scope');
   assert.equal((await call('PATCH', `/api/v1/items/${saved.data.item.id}`, extension, { title: 'x' })).status, 403);
 
+  const found = await call('GET', `/api/v1/lookup?url=${encodeURIComponent('https://example.com/ratgdo')}`, reader);
+  assert.equal(found.data.item.id, saved.data.item.id);
+  assert.equal((await call('GET', '/api/v1/lookup?url=https%3A%2F%2Fexample.com%2Fnope', reader)).data.item, null);
+
   const note = await call('POST', '/api/v1/capture', extension, { selection: 'A quote with no URL' });
   assert.equal(note.data.item.type, 'note');
 });
@@ -148,4 +152,12 @@ test('MCP over HTTP honors the token and its scopes, in both protocol eras', asy
   await modern.close();
 
   await assert.rejects(connect('em_forged'));
+});
+
+test('pairing links carry the server, token and device name', () => {
+  const link = new URL(pairingLink('http://192.168.1.20:49231', 'em_abc', 'Isaac\'s iPhone'));
+  assert.equal(link.protocol, 'enve-memory:');
+  assert.equal(link.searchParams.get('url'), 'http://192.168.1.20:49231');
+  assert.equal(link.searchParams.get('token'), 'em_abc');
+  assert.equal(link.searchParams.get('name'), "Isaac's iPhone");
 });

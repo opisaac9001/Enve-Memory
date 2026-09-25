@@ -70,6 +70,10 @@ export const routes: Route[] = [
     method: 'GET', pattern: path('/items'), scope: 'read',
     handle: ({ memory, query }) => memory.items.list(queryFilter(query), queryLimit(query)),
   },
+  {
+    method: 'GET', pattern: path('/lookup'), scope: 'read',
+    handle: ({ memory, query }) => ({ item: memory.items.findByUrl(query.get('url') ?? '') }),
+  },
   { method: 'GET', pattern: path('/items/:id'), scope: 'read', handle: ({ memory, params }) => memory.items.get(params[0]!) },
   {
     method: 'POST', pattern: path('/items'), scope: 'capture', status: 201,
