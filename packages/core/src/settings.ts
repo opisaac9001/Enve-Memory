@@ -15,6 +15,8 @@ export interface Settings {
   /** Summarize and suggest tags/projects for new items. Only items saved after `aiEnrichSince` are sent, so turning it on never bills a backlog. */
   aiEnrich: boolean;
   aiEnrichSince: string;
+  /** Apply suggested tags and project straight away instead of waiting for the user to accept them. */
+  aiAutoApply: boolean;
   /** Shared folder (iCloud Drive, Dropbox, Syncthing…) to sync this library through; empty means off. */
   syncFolder: string;
 }
@@ -27,6 +29,7 @@ const DEFAULTS: Settings = {
   aiBaseUrl: '',
   aiEnrich: false,
   aiEnrichSince: '',
+  aiAutoApply: false,
   syncFolder: '',
 };
 

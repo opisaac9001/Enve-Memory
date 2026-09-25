@@ -48,20 +48,24 @@ export async function enrichItem(memory: EnveMemory, provider: AiProvider, id: s
       ].join('\n'),
     }));
     const project = reply.project ? projects.find((p) => p.name.toLowerCase() === reply.project!.trim().toLowerCase()) : undefined;
-    return memory.withActor(ENRICH_ACTOR, () => memory.items.suggest(id, {
+    return memory.withActor(ENRICH_ACTOR, () => applyIfWanted(memory, memory.items.suggest(id, {
       status: 'done',
       at,
       model: `${provider.id}:${provider.model}`,
       summary: String(reply.summary ?? '').trim().slice(0, 1000),
       tags: [...new Set((Array.isArray(reply.tags) ? reply.tags : []).flatMap((t) => safeTag(String(t))))].slice(0, MAX_TAGS),
       project: project ? { id: project.id, name: project.name } : null,
-    }));
+    })));
   } catch (error) {
     const message = error instanceof AiError ? error.message : `Enrichment failed: ${(error as Error).message}`;
     return memory.withActor(ENRICH_ACTOR, () =>
       memory.items.suggest(id, { status: 'failed', at, model: `${provider.id}:${provider.model}`, error: message }),
     );
   }
+}
+
+function applyIfWanted(memory: EnveMemory, item: ItemDetail): ItemDetail {
+  return memory.settings.get('aiAutoApply') ? memory.items.acceptSuggestions(item.id) : item;
 }
 
 function safeTag(value: string): string[] {

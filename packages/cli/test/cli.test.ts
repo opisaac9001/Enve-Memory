@@ -81,7 +81,8 @@ test('AI is off until a provider is chosen, and misconfiguration is explained', 
   assert.equal(noKey.code, 1);
   assert.match(noKey.stderr, /needs an API key \(set ANTHROPIC_API_KEY\)/);
   const configured = json(home, ['ai', 'use', 'ollama', '--model', 'qwen2.5:1.5b', '--base-url', 'http://127.0.0.1:9']);
-  assert.deepEqual(configured, { provider: 'ollama', model: 'qwen2.5:1.5b', baseUrl: 'http://127.0.0.1:9', enrich: false, enrichSince: null });
+  assert.deepEqual(configured, { provider: 'ollama', model: 'qwen2.5:1.5b', baseUrl: 'http://127.0.0.1:9', enrich: false, enrichSince: null, autoApply: false });
+  assert.equal(json(home, ['ai', 'auto-apply', 'on']).autoApply, true);
   assert.equal(json(home, ['ai', 'enrich', 'on']).enrich, true);
   assert.equal(json(home, ['ai', 'off']).provider, 'none');
 });

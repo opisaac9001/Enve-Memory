@@ -130,3 +130,14 @@ test('long sources contribute the passages that match the question', async () =>
   const doc = [...common.slice(0, 3), rare, ...common.slice(3)].join('\n\n');
   assert.match(relevantPassages(doc, 'how do rolling codes stop replaying my garage remote', 1000), /sequence number expires/);
 });
+
+test('with auto-apply on, suggestions are applied as they arrive', async () => {
+  const memory = open();
+  memory.projects.create({ name: 'Garage' });
+  memory.settings.set('aiAutoApply', true);
+  const note = memory.items.saveNote({ body: 'opener wiring' });
+  const enriched = await enrichItem(memory, new FakeProvider(() => '{"summary":"s","tags":["wiring"],"project":"Garage"}'), note.id);
+  assert.deepEqual(enriched.tags, ['wiring']);
+  assert.equal(enriched.project?.name, 'Garage');
+  assert.equal(enriched.metadata.ai?.accepted, true);
+});

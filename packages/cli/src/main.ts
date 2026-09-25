@@ -71,6 +71,7 @@ AI (optional; bring your own provider)
   ai models                    List the provider's models
   ai off                       Turn AI off
   ai enrich on|off             Summarize and suggest tags/projects for items saved from now on
+  ai auto-apply on|off         Apply suggested tags and projects automatically instead of waiting for accept
   enrich <id>                  Summarize one item and suggest tags and a project now
   accept <id>                  Apply an item's suggested tags and project
   ask <question…>              Answer from your library with numbered citations  [-p project]
@@ -450,6 +451,10 @@ async function runAi(memory: EnveMemory): Promise<void> {
       const models = await requireProvider(memory).listModels();
       return emit(models, models.join('\n'));
     }
+    case 'auto-apply':
+      if (value !== 'on' && value !== 'off') throw new UsageError('Usage: ai auto-apply on|off');
+      memory.settings.set('aiAutoApply', value === 'on');
+      break;
     case 'enrich':
       if (value !== 'on' && value !== 'off') throw new UsageError('Usage: ai enrich on|off');
       if (value === 'on') requireProvider(memory);
@@ -457,7 +462,7 @@ async function runAi(memory: EnveMemory): Promise<void> {
       if (value === 'on') memory.settings.set('aiEnrichSince', new Date().toISOString());
       break;
     default:
-      throw new UsageError('Usage: ai [use|models|off|enrich]');
+      throw new UsageError('Usage: ai [use|models|off|enrich|auto-apply]');
   }
   const settings = memory.settings.all();
   const status = {
@@ -466,10 +471,11 @@ async function runAi(memory: EnveMemory): Promise<void> {
     baseUrl: settings.aiBaseUrl || null,
     enrich: settings.aiEnrich,
     enrichSince: settings.aiEnrichSince || null,
+    autoApply: settings.aiAutoApply,
   };
   return emit(status, settings.aiProvider === 'none'
     ? 'AI is off. Everything else works without it. Turn it on with `enve-memory ai use <provider>`.'
-    : `Provider  ${settings.aiProvider}${settings.aiBaseUrl ? ` at ${settings.aiBaseUrl}` : ''}\nModel     ${settings.aiModel}\nEnrich    ${settings.aiEnrich ? `on (items saved since ${settings.aiEnrichSince})` : 'off'}`);
+    : `Provider  ${settings.aiProvider}${settings.aiBaseUrl ? ` at ${settings.aiBaseUrl}` : ''}\nModel     ${settings.aiModel}\nEnrich    ${settings.aiEnrich ? `on (items saved since ${settings.aiEnrichSince})` : 'off'}\nApply     ${settings.aiAutoApply ? 'automatically' : 'when you accept'}`);
 }
 
 function runRules(memory: EnveMemory): void {
