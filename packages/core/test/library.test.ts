@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { EnveMemory, MemoryError } from '@enve-memory/core';
 
@@ -89,6 +92,27 @@ test('saving an already-bookmarked URL returns the original and merges notes and
   assert.equal(memory.items.saveLink({ url: 'https://example.com/security-plus', project: 'garage' }).item.project?.name, 'Garage');
   assert.equal(memory.items.saveLink({ url: 'https://example.com/security-plus', project: 'plex' }).item.project?.name, 'Garage');
   assert.throws(() => memory.items.saveLink({ url: 'not a url' }), failsWith('invalid'));
+});
+
+test('the inbox is everything not filed in a project', () => {
+  const memory = open();
+  memory.projects.create({ name: 'Garage' });
+  const loose = memory.items.saveNote({ body: 'loose' });
+  memory.items.saveNote({ body: 'filed', project: 'garage' });
+  assert.deepEqual(memory.items.list({ inbox: true }).map((i) => i.id), [loose.id]);
+});
+
+test('another connection committing bumps the data version', () => {
+  const home = mkdtempSync(join(tmpdir(), 'enve-memory-version-'));
+  const app = EnveMemory.open({ home, actor: 'desktop' });
+  const cli = EnveMemory.open({ home, actor: 'cli' });
+  const before = app.dataVersion;
+  app.items.saveNote({ body: 'own write' });
+  assert.equal(app.dataVersion, before, 'own commits do not count');
+  cli.items.saveNote({ body: 'outside write' });
+  assert.notEqual(app.dataVersion, before);
+  app.close();
+  cli.close();
 });
 
 test('archived items are hidden from lists and search until unarchived', () => {

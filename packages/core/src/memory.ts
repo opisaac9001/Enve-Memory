@@ -90,6 +90,11 @@ export class EnveMemory {
     return this.ctx.deviceId;
   }
 
+  /** Changes whenever another connection (an MCP server, the CLI) commits; poll it to notice outside edits. */
+  get dataVersion(): number {
+    return (this.db.prepare('PRAGMA data_version').get() as { data_version: number }).data_version;
+  }
+
   get schemaVersion(): number {
     return schemaVersion(this.db);
   }

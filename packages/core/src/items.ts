@@ -12,6 +12,8 @@ import {
 
 export interface ItemFilter {
   project?: string;
+  /** Only items in no project. */
+  inbox?: boolean;
   type?: string;
   tag?: string;
   includeArchived?: boolean;
@@ -344,6 +346,7 @@ export class ItemService {
     const where: string[] = [];
     const params: SQLInputValue[] = [];
     if (!filter.includeArchived) where.push('i.archived_at IS NULL');
+    if (filter.inbox) where.push('i.project_id IS NULL');
     if (filter.project !== undefined) {
       where.push('i.project_id = ?');
       params.push(this.projects.resolve(filter.project).id);
