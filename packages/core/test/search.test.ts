@@ -57,3 +57,11 @@ test('updated text is re-indexed', () => {
   assert.equal(memory.search.query('relays').length, 0);
   assert.equal(memory.search.query('reed').length, 1);
 });
+
+test('snippets read as text, not Markdown', () => {
+  const memory = open();
+  const note = memory.items.saveNote({ body: '# Wiring guide\n\nSee **the** [pinout](https://example.com/p) for `GPIO4`.' });
+  const [hit] = memory.search.query('pinout');
+  assert.equal(hit?.id, note.id);
+  assert.equal(hit?.snippet, 'Wiring guide See the [pinout] for GPIO4.');
+});

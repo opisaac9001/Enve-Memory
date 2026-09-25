@@ -30,14 +30,14 @@ export class SearchService {
     const { where, params } = this.items.filterClauses(filter);
     return this.ctx
       .all<ItemRow & { snippet: string }>(
-        `SELECT ${ITEM_COLUMNS}, snippet(items_fts, -1, '[', ']', '…', 24) AS snippet
+        `SELECT ${ITEM_COLUMNS}, snippet(items_fts, -1, char(1), char(2), '…', 24) AS snippet
          FROM items_fts JOIN items i ON i.seq = items_fts.rowid ${ITEM_JOINS}
          WHERE items_fts MATCH ? ${where.map((w) => `AND ${w}`).join(' ')}
          ORDER BY ${RANK}, i.updated_at DESC
          LIMIT ?`,
         match, ...params, clampLimit(limit ?? 20),
       )
-      .map((row) => toHit(row, row.snippet, 'keyword'));
+      .map((row) => toHit(row, plainSnippet(row.snippet), 'keyword'));
   }
 
   /**
@@ -107,8 +107,23 @@ function toHit(row: ItemRow, snippet: string, match: SearchHit['match']): Search
   };
 }
 
+/**
+ * Snippets come from stored Markdown; drop its syntax (headings, emphasis, link targets) so they read as text.
+ * Matches are marked with control characters first, so they can't be mistaken for Markdown brackets, then shown as [match].
+ */
+function plainSnippet(text: string): string {
+  return text
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/(^|[\s…])#{1,6}\s+/g, '$1')
+    .replace(/\*\*|__|`/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\u0001/g, '[')
+    .replace(/\u0002/g, ']')
+    .trim();
+}
+
 const excerpt = (text: string) => {
-  const flat = text.replace(/\s+/g, ' ').trim();
+  const flat = plainSnippet(text);
   return flat.length > SNIPPET_LENGTH ? `${flat.slice(0, SNIPPET_LENGTH)}…` : flat;
 };
 

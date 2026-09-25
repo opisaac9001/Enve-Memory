@@ -138,6 +138,10 @@ memory.items.suggest(essay.id, {
   tags: ['local-first', 'essay'], project: null,
 });
 const inbox = as('api:Chrome extension', () => memory.items.saveLink({ url: 'https://docs.example.org/home-assistant-covers', title: 'Home Assistant cover entities', ingest: false }).item);
+memory.withActor('ingest', () => memory.items.setSource(inbox.id, {
+  content: '# Home Assistant cover entities\n\nA cover is anything that opens and closes: garage doors, gates, blinds. It reports open, closed, opening or closing, and offers open, close and stop services. For a garage door opener, pair the cover with a separate door-position sensor such as a reed switch.',
+  metadata: { siteName: 'Automation Handbook', excerpt: 'Covers model garage doors, gates and blinds with open, close and stop.', ingest: { status: 'done', at: days(0) } },
+}));
 memory.items.suggest(inbox.id, {
   status: 'done', at: days(0), model: 'ollama:qwen2.5:1.5b',
   summary: 'How Home Assistant models garage doors as cover entities with open, close and stop.',
