@@ -68,6 +68,8 @@ export interface SaveLinkInput {
   ingest?: boolean;
   /** Why it's being saved; guessed from the address when omitted. */
   intent?: Intent;
+  /** When it was originally bookmarked (importers); applies only to a new bookmark. */
+  createdAt?: string;
 }
 
 export interface UpdateItemInput {
@@ -136,6 +138,7 @@ export class ItemService {
         intentAuto: input.intent === undefined,
       },
       intent: input.intent ?? detectIntent(url),
+      createdAt: input.createdAt,
     });
     return { item: this.get(id), created: true };
   }

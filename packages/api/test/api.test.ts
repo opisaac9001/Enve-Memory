@@ -248,3 +248,15 @@ test('accepting AI suggestions over the API needs write', async () => {
   assert.equal((await call('POST', `/api/v1/items/${note.id}/accept`, extension)).status, 403);
   assert.deepEqual((await call('POST', `/api/v1/items/${note.id}/accept`, writer)).data.tags, ['filed']);
 });
+
+test('capture clients can change intent on re-save, keep import dates, and hand off reminders', async () => {
+  const first = await call('POST', '/api/v1/capture', extension, { url: 'https://example.com/handoff', createdAt: '2019-05-01T12:00:00Z', remind: '2020-01-01T00:00:00Z' });
+  assert.equal(first.data.item.createdAt, '2019-05-01T12:00:00.000Z');
+  const again = await call('POST', '/api/v1/capture', extension, { url: 'https://example.com/handoff', intent: 'watch', createdAt: '2001-01-01T00:00:00Z' });
+  assert.equal(again.data.item.intent, 'watch');
+  assert.equal(again.data.item.createdAt, '2019-05-01T12:00:00.000Z', 'the original date stays');
+  assert.ok((await call('GET', '/api/v1/reminders?due=true', reader)).data.some((i: { id: string }) => i.id === first.data.item.id));
+  assert.equal((await call('POST', `/api/v1/items/${first.data.item.id}/reminded`, extension)).status, 200);
+  assert.equal((await call('GET', '/api/v1/reminders?due=true', reader)).data.some((i: { id: string }) => i.id === first.data.item.id), false);
+  assert.equal((await call('POST', '/api/v1/capture', extension, { url: 'https://example.com/x2', createdAt: 'yesterday-ish' })).status, 400);
+});

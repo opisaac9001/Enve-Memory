@@ -81,13 +81,21 @@ function capture(memory: EnveMemory, body: RouteContext['body']) {
   const note = captureNote(str(body, 'note'), str(body, 'selection'));
   const common = { title: str(body, 'title'), project: str(body, 'project'), tags: strList(body, 'tags') };
   const intent = str(body, 'intent');
+  const createdAt = str(body, 'createdAt');
+  if (createdAt !== undefined && Number.isNaN(Date.parse(createdAt))) throw badField('createdAt', 'an ISO 8601 time');
   const saved = url
-    ? memory.items.saveLink({ ...common, url, note, ...(intent ? { intent: oneOfIntent(intent) } : {}) })
+    ? memory.items.saveLink({
+      ...common, url, note, ...(intent ? { intent: oneOfIntent(intent) } : {}),
+      ...(createdAt ? { createdAt: new Date(Date.parse(createdAt)).toISOString() } : {}),
+    })
     : { item: memory.items.saveNote({ ...common, body: note ?? '' }), created: true };
+  // Re-saving a page is how capture-only clients say "actually, I want to watch this".
+  if (!saved.created && intent && saved.item.intent !== intent) memory.items.setIntent(saved.item.id, intent);
   const remind = str(body, 'remind');
   if (remind) memory.items.setReminder(saved.item.id, remind);
   if (bool(body, 'pinned')) memory.items.pin(saved.item.id, true);
-  return { item: remind || bool(body, 'pinned') ? memory.items.get(saved.item.id) : saved.item, created: saved.created };
+  const changed = remind || bool(body, 'pinned') || (!saved.created && intent);
+  return { item: changed ? memory.items.get(saved.item.id) : saved.item, created: saved.created };
 }
 
 function oneOfIntent(value: string): Intent {
@@ -167,6 +175,14 @@ export const routes: Route[] = [
   {
     method: 'POST', pattern: path('/items/:id/accept'), scope: 'write',
     handle: ({ memory, params }) => memory.items.acceptSuggestions(params[0]!),
+  },
+  {
+    // Whichever client shows a reminder first (desktop, extension, phone) marks it, so the others don't repeat it.
+    method: 'POST', pattern: path('/items/:id/reminded'), scope: 'capture',
+    handle: ({ memory, params }) => {
+      memory.items.markReminded(params[0]!);
+      return { ok: true };
+    },
   },
   {
     method: 'GET', pattern: path('/reminders'), scope: 'read',

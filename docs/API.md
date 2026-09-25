@@ -31,9 +31,10 @@ Errors are `{"error": {"code", "message"}}` with the status: `401 unauthorized`,
 | `GET /items/:id` | read | Full item with `content`, `attachments`, `tags`, `task`, `relations` and `metadata` |
 | `GET` or `HEAD /items/:id/file` | read | The file's bytes with `Content-Type` and `Content-Disposition` |
 | `GET /lookup?url=` | read | `{item}` if the URL is already bookmarked, else `{item: null}` |
-| `POST /capture` | capture | `{url?, title?, note?, selection?, project?, tags?, intent?, remind?, pinned?}` → `{item, created}`. A URL becomes a bookmark (re-saving merges the note and tags); otherwise it's a note. The selection is stored as a quote. `remind` accepts plain words ("tomorrow", "friday", "in 3 days") or an ISO time. |
+| `POST /capture` | capture | `{url?, title?, note?, selection?, project?, tags?, intent?, remind?, pinned?, createdAt?}` → `{item, created}`. A URL becomes a bookmark (re-saving merges the note and tags); otherwise it's a note. The selection is stored as a quote. `remind` accepts plain words ("tomorrow", "friday", "in 3 days") or an ISO time. `intent` on an already-saved URL changes it; `createdAt` (e.g. an imported bookmark's original date) applies only to a new bookmark. |
 | `POST /capture/batch` | capture | `{items: [capture bodies]}` (≤ 2000) → `{created, skipped, failed, results}`; each entry succeeds or fails alone |
 | `POST /items/:id/opened` | capture | Records that the user opened it (drives the "unopened" shelf) |
+| `POST /items/:id/reminded` | capture | Marks a due reminder delivered, so other clients don't show it again (`/reminders?due=true` omits delivered ones) |
 | `POST /items` | capture | `{type: note \| bookmark \| task, title, body, url, project, tags, due, priority}` |
 | `POST /files` | capture | Raw body. Headers: `Content-Type`, `X-Filename`, and optionally `X-Title`, `X-Note`, `X-Project`, `X-Tags` (comma list), `X-Remind`, `X-Intent`, `X-Pinned: true`, all percent-encoded UTF-8. Up to 200 MB. |
 | `PATCH /items/:id` | write | `{title?, body?, url?, project? (null = unfile)}` |
