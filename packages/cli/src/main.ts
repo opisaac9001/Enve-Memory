@@ -1,8 +1,12 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type ParseArgsConfig, parseArgs } from 'node:util';
-import { EnveMemory, MemoryError } from '@enve-memory/core';
+import { EnveMemory, MemoryError, type Settings } from '@enve-memory/core';
+import { ingestItem, processPending } from '@enve-memory/ingestion';
 import { DEFAULT_PORT, createApiServer, lanUrls, pairingLink } from '@enve-memory/api';
 import { SERVER_NAME, serveMemoryOverStdio } from '@enve-memory/mcp';
 import pkg from '../package.json' with { type: 'json' };
@@ -14,13 +18,15 @@ Usage: enve-memory <command> [options]
 
 Capture
   note <text…>                 Save a note           [--title] [-p project] [-t tag]…
-  link <url>                   Save a link           [--title] [--note] [-p project] [-t tag]…
+  link <url>                   Save and archive a link  [--title] [--note] [-p project] [-t tag]… [--no-fetch]
+  file <path>…                 Save files (PDFs and text become searchable)  [--title] [--note] [-p project] [-t tag]…
   task add <title…>            Add a task            [-p project] [--due] [--priority high|normal|low] [--notes] [-t tag]…
 
 Find
   search <query…>              Full-text search      [-p project] [--type] [-t tag] [--limit] [--all]
   list                         Recent items          [-p project] [--type] [-t tag] [--limit] [--all]
-  show <id>                    One item in full
+  show <id>                    One item in full      [--content] prints the archived text
+  open <id>                    Open a link in the browser or a file in its app
   task list                    Tasks                 [-p project] [--status active|open|in_progress|done|cancelled|all]
   activity                     Recent changes        [-p project] [--limit]
 
@@ -51,6 +57,8 @@ AI clients and devices
   clients revoke <id>          Revoke a token immediately
 
 Other
+  ingest                       Fetch and extract anything still pending  [--retry] also retries failures
+  settings [key] [value]       Show or change settings (fetchLinks true|false)
   info                         Library location and stats
 
 Global options: --home DIR (default $ENVE_MEMORY_HOME or the platform data folder), --json, -h, -v`;
@@ -87,6 +95,9 @@ const { values: opts, positionals } = parseCommandLine({
     scope: { type: 'string', multiple: true },
     port: { type: 'string' },
     lan: { type: 'boolean' },
+    'no-fetch': { type: 'boolean' },
+    content: { type: 'boolean' },
+    retry: { type: 'boolean' },
     limit: { type: 'string' },
     all: { type: 'boolean' },
     yes: { type: 'boolean' },
@@ -124,17 +135,57 @@ function emit(data: unknown, human: string): void {
   console.log(opts.json ? JSON.stringify(data, null, 2) : human);
 }
 
-function run(memory: EnveMemory): void {
+async function run(memory: EnveMemory): Promise<void> {
   switch (command) {
     case 'note': {
       const item = memory.items.saveNote({ body: text(0, 'text'), title: opts.title, project: opts.project, tags: opts.tag });
       return emit(item, `Saved note ${item.id}`);
     }
     case 'link': {
-      const { item, created } = memory.items.saveLink({
+      const saved = memory.items.saveLink({
         url: arg(0, 'url'), title: opts.title, note: opts.note, project: opts.project, tags: opts.tag,
+        ...(opts['no-fetch'] ? { ingest: false } : {}),
       });
-      return emit({ item, created }, `${created ? 'Saved' : 'Already saved'}: ${item.id}`);
+      const item = saved.item.metadata.ingest?.status === 'pending' ? await ingestItem(memory, saved.item.id) : saved.item;
+      return emit({ item, created: saved.created }, `${saved.created ? 'Saved' : 'Already saved'}: ${format.savedLine(item)}`);
+    }
+    case 'file': {
+      if (rest.length === 0) throw new UsageError('Missing <path>.');
+      const results = [];
+      for (const path of rest) {
+        const saved = memory.files.saveFromPath(path, { title: rest.length === 1 ? opts.title : undefined, note: opts.note, project: opts.project, tags: opts.tag });
+        const item = saved.item.metadata.ingest?.status === 'pending' ? await ingestItem(memory, saved.item.id) : saved.item;
+        results.push({ item, created: saved.created });
+      }
+      return emit(results, results.map((r) => `${r.created ? 'Saved' : 'Already saved'}: ${format.savedLine(r.item)}`).join('\n'));
+    }
+    case 'open': {
+      const item = memory.items.get(arg(0, 'id'));
+      let target = item.url;
+      if (item.attachments.length > 0) {
+        const { attachment, path } = memory.files.primary(item.id);
+        const dir = join(tmpdir(), 'enve-memory', item.id);
+        mkdirSync(dir, { recursive: true });
+        target = join(dir, attachment.filename);
+        copyFileSync(path, target);
+      }
+      if (!target) throw new UsageError('That item has no link or file to open.');
+      openExternal(target);
+      return emit({ opened: target }, `Opened ${target}`);
+    }
+    case 'ingest': {
+      const retried = opts.retry ? memory.items.retryFailedIngest() : 0;
+      const processed = await processPending(memory, { limit: 200 });
+      return emit({ processed, retried }, processed ? `Processed ${processed} item${processed === 1 ? '' : 's'}.` : 'Nothing pending.');
+    }
+    case 'settings': {
+      const [key, value] = rest;
+      if (key && value !== undefined) {
+        if (value !== 'true' && value !== 'false') throw new UsageError('Setting values are true or false.');
+        memory.settings.set(key as keyof Settings, value === 'true');
+      }
+      const settings = memory.settings.all();
+      return emit(settings, Object.entries(settings).map(([k, v]) => `${k.padEnd(14)}${v}`).join('\n'));
     }
     case 'search': {
       const hits = memory.search.query(text(0, 'query'), filter(), limit());
@@ -146,7 +197,7 @@ function run(memory: EnveMemory): void {
     }
     case 'show': {
       const item = memory.items.get(arg(0, 'id'));
-      return emit(item, format.itemDetail(item));
+      return emit(item, opts.content ? item.content || '(no archived text)' : format.itemDetail(item));
     }
     case 'edit': {
       const item = memory.items.update(arg(0, 'id'), {
@@ -340,7 +391,7 @@ Clients that connect over HTTP (remote agents, other machines):
   3. Point the client at http://127.0.0.1:${DEFAULT_PORT}/mcp with header  Authorization: Bearer <token>`;
 }
 
-function main(): number {
+async function main(): Promise<number> {
   if (opts.version) {
     console.log(pkg.version);
     return 0;
@@ -354,7 +405,7 @@ function main(): number {
     return 0;
   }
   if (command === 'serve') {
-    void serve().catch(fail);
+    await serve();
     return 0;
   }
   if (command === 'mcp') {
@@ -365,11 +416,18 @@ function main(): number {
 
   const memory = EnveMemory.open({ home: opts.home, actor: 'cli' });
   try {
-    run(memory);
+    await run(memory);
     return 0;
   } finally {
     memory.close();
   }
+}
+
+function openExternal(target: string): void {
+  const [cmd, args] = process.platform === 'darwin' ? ['open', [target]]
+    : process.platform === 'win32' ? ['cmd', ['/c', 'start', '""', target]]
+    : ['xdg-open', [target]];
+  spawn(cmd, args as string[], { detached: true, stdio: 'ignore' }).unref();
 }
 
 function fail(error: unknown): void {
@@ -387,8 +445,6 @@ function fail(error: unknown): void {
   }
 }
 
-try {
-  process.exitCode = main();
-} catch (error) {
-  fail(error);
-}
+main().then((code) => {
+  process.exitCode = code;
+}, fail);

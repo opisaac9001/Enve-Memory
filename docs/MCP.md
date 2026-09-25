@@ -20,14 +20,16 @@ Two transports:
 | Tool | Scope | Purpose |
 |---|---|---|
 | `search` | read | Full-text search with project / type / tag filters; ranked hits with highlighted snippets |
-| `get_item` | read | Full item with tags, task fields and relations |
+| `get_item` | read | Full item with tags, task fields, relations, attachments and archived `content` (paged 20k characters at a time via `content_offset`) |
 | `list_items` | read | Recent items, filterable; bodies trimmed to a 280-char preview |
 | `list_projects` | read | Projects (archived ones hidden by default) |
 | `get_project` | read | **Briefing**: description, instructions, memory document, decision log, open tasks, recent notes/links |
 | `list_tasks` | read | Tasks by due date then priority; `active` = open or in progress |
 | `get_recent_activity` | read | Who changed what, newest first |
 | `save_note` | capture | New note |
-| `save_link` | capture | New bookmark; an already-saved URL returns the existing one (`created: false`) and merges the note and tags |
+| `save_file` | capture | Save a file from base64 content, or, over stdio only, from a local path. PDFs and text become searchable. |
+| `get_file` | read | The file itself: images as image content the model can see, text as text |
+| `save_link` | capture | New bookmark, fetched and archived before returning (≤10 s) so the model sees the real title and excerpt; an already-saved URL returns the existing one (`created: false`) and merges the note and tags |
 | `update_item` | write | Edit title / body / URL / project. Refuses decisions. |
 | `archive_item` | write | Hide from lists and search (reversible) |
 | `tag_item` | write | Add/remove tags |

@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { ActivityService } from './activity.ts';
 import { ClientService } from './clients.ts';
+import { FileService } from './files.ts';
 import { Context } from './context.ts';
 import { IN_MEMORY, openDatabase, schemaVersion } from './db.ts';
 import { DecisionService } from './decisions.ts';
@@ -8,6 +9,7 @@ import { ItemService } from './items.ts';
 import { type MemoryPaths, defaultHome, pathsFor } from './paths.ts';
 import { ProjectService } from './projects.ts';
 import { SearchService } from './search.ts';
+import { SettingsService } from './settings.ts';
 import { TaskService } from './tasks.ts';
 import { ITEM_TYPES, type ItemType, type ProjectBriefing } from './types.ts';
 
@@ -24,12 +26,14 @@ export interface OpenOptions {
 export class EnveMemory {
   readonly paths: MemoryPaths | null;
   readonly projects: ProjectService;
+  readonly settings: SettingsService;
   readonly items: ItemService;
   readonly tasks: TaskService;
   readonly decisions: DecisionService;
   readonly search: SearchService;
   readonly activity: ActivityService;
   readonly clients: ClientService;
+  readonly files: FileService;
   private readonly db: DatabaseSync;
   private readonly ctx: Context;
 
@@ -42,14 +46,16 @@ export class EnveMemory {
   private constructor(db: DatabaseSync, paths: MemoryPaths | null, actor: string) {
     this.db = db;
     this.paths = paths;
-    this.ctx = new Context(db, actor);
+    this.ctx = new Context(db, actor, paths?.attachments ?? null);
     this.projects = new ProjectService(this.ctx);
-    this.items = new ItemService(this.ctx, this.projects);
+    this.settings = new SettingsService(this.ctx);
+    this.items = new ItemService(this.ctx, this.projects, this.settings);
     this.tasks = new TaskService(this.ctx, this.items, this.projects);
     this.decisions = new DecisionService(this.ctx, this.items, this.projects);
     this.search = new SearchService(this.ctx, this.items);
     this.activity = new ActivityService(this.ctx, this.projects);
     this.clients = new ClientService(this.ctx);
+    this.files = new FileService(this.ctx, this.items);
   }
 
   get actor(): string {
@@ -58,6 +64,17 @@ export class EnveMemory {
 
   set actor(actor: string) {
     this.ctx.actor = actor;
+  }
+
+  /** Runs a synchronous write under a different actor, e.g. a background worker, then restores the current one. */
+  withActor<T>(actor: string, fn: () => T): T {
+    const previous = this.ctx.actor;
+    this.ctx.actor = actor;
+    try {
+      return fn();
+    } finally {
+      this.ctx.actor = previous;
+    }
   }
 
   get deviceId(): string {

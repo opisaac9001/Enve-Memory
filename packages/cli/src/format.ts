@@ -36,9 +36,26 @@ export function projectLine(project: Project): string {
   return `${project.name}${status}${description}\n    ${project.slug}  ${project.id}`;
 }
 
+export function savedLine(item: ItemDetail): string {
+  const ingest = item.metadata.ingest;
+  const status = ingest?.status === 'failed' ? `  (couldn't archive: ${ingest.error})` : ingest?.status === 'pending' ? '  (archiving later)' : '';
+  return `${label(item)}${status}\n    ${item.id}`;
+}
+
+const size = (bytes: number) =>
+  bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+
 export function itemDetail(item: ItemDetail): string {
   const lines = [`${item.type}: ${item.title || '(untitled)'}`, `id:      ${item.id}`];
   if (item.url) lines.push(`url:     ${item.url}`);
+  for (const file of item.attachments) lines.push(`file:    ${file.filename} (${file.mimeType}, ${size(file.size)})`);
+  const { siteName, byline, publishedAt, excerpt, ingest } = item.metadata;
+  const source = [siteName, byline, publishedAt && localDate(publishedAt)].filter(Boolean).join(' · ');
+  if (source) lines.push(`source:  ${source}`);
+  if (excerpt) lines.push(`excerpt: ${oneLine(excerpt, 200)}`);
+  if (ingest?.status === 'failed') lines.push(`archive: failed — ${ingest.error}`);
+  else if (ingest?.status === 'pending') lines.push('archive: pending');
+  if (item.content) lines.push(`text:    ${item.content.length.toLocaleString()} characters archived (show --content)`);
   if (item.project) lines.push(`project: ${item.project.name}`);
   if (item.task) {
     lines.push(`status:  ${item.task.status} (${item.task.priority} priority)`);

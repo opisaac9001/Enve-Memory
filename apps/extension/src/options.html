@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="dark light">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enve Memory Settings</title>
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="options.css">
+  <script type="module" src="options.js"></script>
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <span class="brand"><img src="icons/icon-48.png" alt="" width="28" height="28">Enve Memory</span>
+      <p class="subtitle">Save pages, links and selections from your browser to your own library.</p>
+    </header>
+
+    <form id="settings" class="panel" novalidate>
+      <h2>Connection</h2>
+
+      <label class="field">
+        <span class="label">Server</span>
+        <input id="server-url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:49231">
+      </label>
+      <p class="help">Where Enve Memory is running. The default works when the app or <code>enve-memory serve</code> runs on this computer.</p>
+
+      <div class="field">
+        <label class="label" for="token">Access token</label>
+        <div class="secret">
+          <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="em_…">
+          <button type="button" class="button" id="reveal" aria-pressed="false">Show</button>
+        </div>
+      </div>
+      <p class="help">Create one in a terminal. It's shown once, and stays in this browser profile only.</p>
+      <code class="command">enve-memory clients add "Browser" --scope read,capture</code>
+
+      <div id="result" class="message" role="status" hidden>
+        <p id="result-title" class="result-title"></p>
+        <p id="result-detail"></p>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="button" id="test">Test connection</button>
+        <button type="submit" class="button primary" id="save">Save</button>
+      </div>
+    </form>
+
+    <section class="panel">
+      <h2>Saving</h2>
+      <p class="help">Click the toolbar button to save the page with a project, tags and a note. Right-click a page, selection or link to save it instantly. Instant saves go to the project you last picked in the popup.</p>
+      <dl id="shortcuts" class="shortcuts"></dl>
+      <p class="help">Change shortcuts in your browser's extension shortcut settings.</p>
+    </section>
+  </main>
+</body>
+</html>

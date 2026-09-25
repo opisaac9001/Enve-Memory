@@ -3,8 +3,8 @@ import { invalid } from './errors.ts';
 import { type ItemFilter, type ItemService, clampLimit } from './items.ts';
 import type { SearchHit } from './types.ts';
 
-// bm25 column weights for (title, body, url).
-const RANK = 'bm25(items_fts, 10.0, 1.0, 2.0)';
+// bm25 column weights for (title, body, url, content): the user's own words outrank extracted source text.
+const RANK = 'bm25(items_fts, 10.0, 1.5, 2.0, 1.0)';
 
 export class SearchService {
   private readonly ctx: Context;

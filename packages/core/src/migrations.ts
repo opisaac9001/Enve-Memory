@@ -126,4 +126,47 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT;
     `,
   },
+  {
+    name: 'content_and_attachments',
+    sql: `
+      -- content is text extracted from the source (web article, PDF, text file): untrusted, kept apart from the user's own body.
+      ALTER TABLE items ADD COLUMN content TEXT NOT NULL DEFAULT '';
+      ALTER TABLE items ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(metadata));
+      CREATE INDEX items_ingest ON items(json_extract(metadata, '$.ingest.status')) WHERE json_extract(metadata, '$.ingest.status') = 'pending';
+
+      CREATE TABLE attachments (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        sha256 TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      ) STRICT;
+      CREATE INDEX attachments_item ON attachments(item_id);
+      CREATE INDEX attachments_sha ON attachments(sha256);
+
+      DROP TRIGGER items_fts_insert;
+      DROP TRIGGER items_fts_delete;
+      DROP TRIGGER items_fts_update;
+      DROP TABLE items_fts;
+      CREATE VIRTUAL TABLE items_fts USING fts5(
+        title, body, url, content,
+        content = 'items',
+        content_rowid = 'seq',
+        tokenize = 'porter unicode61 remove_diacritics 2'
+      );
+      CREATE TRIGGER items_fts_insert AFTER INSERT ON items BEGIN
+        INSERT INTO items_fts(rowid, title, body, url, content) VALUES (new.seq, new.title, new.body, new.url, new.content);
+      END;
+      CREATE TRIGGER items_fts_delete AFTER DELETE ON items BEGIN
+        INSERT INTO items_fts(items_fts, rowid, title, body, url, content) VALUES ('delete', old.seq, old.title, old.body, old.url, old.content);
+      END;
+      CREATE TRIGGER items_fts_update AFTER UPDATE OF title, body, url, content ON items BEGIN
+        INSERT INTO items_fts(items_fts, rowid, title, body, url, content) VALUES ('delete', old.seq, old.title, old.body, old.url, old.content);
+        INSERT INTO items_fts(rowid, title, body, url, content) VALUES (new.seq, new.title, new.body, new.url, new.content);
+      END;
+      INSERT INTO items_fts(items_fts) VALUES ('rebuild');
+    `,
+  },
 ];

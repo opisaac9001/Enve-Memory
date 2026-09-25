@@ -6,6 +6,7 @@ import { EnveMemory } from '@enve-memory/core';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 
 const memory = EnveMemory.open({ inMemory: true, actor: 'test' });
+memory.settings.set('fetchLinks', false);
 const api = createApiServer(memory, { version: '0.0.0-test', port: 0 });
 const base = await api.listen();
 after(() => api.close());

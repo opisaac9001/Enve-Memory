@@ -22,10 +22,11 @@
 |---|---|
 | `packages/core` | Schema and migrations, services (projects, items, tasks, decisions, search, activity), and the `EnveMemory` facade. No dependencies. |
 | `packages/mcp` | MCP tool definitions over core, using the official TypeScript SDK v2 (`@modelcontextprotocol/server`, spec 2026-07-28). Thin: argument shaping and output trimming only. |
+| `packages/ingestion` | Fetch (no cookies, time/size caps), readable-article extraction (Readability + linkedom → Markdown via Turndown), PDF text (unpdf), and `IngestWorker` for background draining. |
 | `packages/api` | Local HTTP server: REST (`/api/v1`) + MCP over Streamable HTTP (`/mcp`), with token auth, scopes and Host/Origin guards. |
 | `packages/cli` | The `enve-memory` binary: human and `--json` commands, `mcp` (stdio), `serve` (HTTP), `clients` (tokens) and `connect` (client setup snippets). |
 
-Planned: `packages/ingestion` (URL/PDF/image extractors), `packages/embeddings` (vector index abstraction), `packages/ai` (provider interface), `apps/desktop`, `apps/extension`, and an `apps/ios` SwiftUI companion.
+Planned: `packages/embeddings` (vector index abstraction), `packages/ai` (provider interface), `apps/desktop`, `apps/extension`, and an `apps/ios` SwiftUI companion.
 
 ## Stack decisions
 
@@ -61,9 +62,9 @@ SQLite runs in WAL mode with a 5 s busy timeout. The desktop app, a CLI invocati
 - **Phase 3:** local embeddings, chunked content, and a `VectorIndex` interface (`add / update / remove / search / rebuild`). The first implementation will be sqlite-vec. It's pre-1.0, which is why it sits behind our own abstraction.
 - **Hybrid:** combine vector, keyword, project and recency scores. The weights will be tuned against a fixture corpus, not guessed.
 
-## Ingestion (Phase 3)
+## Ingestion
 
-`input → type detect → extract → normalize → store → index → embed → optional AI enrichment`. Deterministic steps never depend on AI. A bookmark keeps its URL plus cleaned Markdown (and optionally the original HTML), so it outlives the page. Capture clients such as the browser extension and the share sheet send only `{url, title, selection, note}`. All extraction logic lives once, in the desktop process.
+`save → (pending) → fetch or read file → extract → setSource(title if empty, content, metadata) → index`. Saving never waits on the network: the CLI and MCP `save_link` wait up to 10 s so the user or model sees the real title, the API returns at once and a background `IngestWorker` finishes the job, and failures are recorded on the item (`metadata.ingest.status = failed`) for `enve-memory ingest --retry`. The `fetchLinks` setting turns all fetching off. Deterministic steps never depend on AI. A bookmark keeps its URL plus cleaned Markdown (and optionally the original HTML), so it outlives the page. Capture clients such as the browser extension and the share sheet send only `{url, title, selection, note}`. All extraction logic lives once, in the desktop process.
 
 ## AI providers (Phase 4)
 

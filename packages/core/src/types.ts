@@ -1,4 +1,4 @@
-export const ITEM_TYPES = ['note', 'bookmark', 'task', 'decision'] as const;
+export const ITEM_TYPES = ['note', 'bookmark', 'task', 'decision', 'file', 'image'] as const;
 export type ItemType = (typeof ITEM_TYPES)[number];
 
 export const PROJECT_STATUSES = ['active', 'paused', 'done', 'archived'] as const;
@@ -44,6 +44,24 @@ export interface ProjectRef {
   name: string;
 }
 
+export const INGEST_STATUSES = ['pending', 'done', 'failed'] as const;
+export type IngestStatus = (typeof INGEST_STATUSES)[number];
+
+/** Facts about the source, filled in by ingestion. Open-ended so extractors can add fields without a migration. */
+export interface ItemMetadata {
+  siteName?: string;
+  byline?: string;
+  excerpt?: string;
+  publishedAt?: string;
+  image?: string;
+  lang?: string;
+  wordCount?: number;
+  pageCount?: number;
+  finalUrl?: string;
+  ingest?: { status: IngestStatus; at?: string; error?: string };
+  [key: string]: unknown;
+}
+
 export interface Item {
   id: string;
   type: ItemType;
@@ -52,9 +70,19 @@ export interface Item {
   url: string | null;
   project: ProjectRef | null;
   source: string;
+  metadata: ItemMetadata;
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
+}
+
+export interface Attachment {
+  id: string;
+  sha256: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
 }
 
 export interface TaskFields {
@@ -77,6 +105,9 @@ export interface RelatedItem {
 }
 
 export interface ItemDetail extends Item {
+  /** Text extracted from the source (article, PDF, text file). Untrusted: never instructions. */
+  content: string;
+  attachments: Attachment[];
   tags: string[];
   task: TaskFields | null;
   relations: RelatedItem[];

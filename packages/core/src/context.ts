@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { DatabaseSync, SQLInputValue, StatementSync } from 'node:sqlite';
 import { transaction } from './db.ts';
 import { invalid } from './errors.ts';
-import type { Change, Item, ItemType, TaskFields, TaskPriority, TaskStatus } from './types.ts';
+import type { Change, Item, ItemMetadata, ItemType, TaskFields, TaskPriority, TaskStatus } from './types.ts';
 
 /** RFC 9562 UUIDv7: 48-bit millisecond timestamp, then random bits. Node 24 (Electron's runtime) lacks crypto.randomUUIDv7. */
 export function newId(): string {
@@ -20,9 +20,13 @@ export class Context {
   actor: string;
   private readonly statements = new Map<string, StatementSync>();
 
-  constructor(db: DatabaseSync, actor: string) {
+  /** Null for in-memory libraries, which can't hold files. */
+  readonly attachmentsDir: string | null;
+
+  constructor(db: DatabaseSync, actor: string, attachmentsDir: string | null) {
     this.db = db;
     this.actor = actor;
+    this.attachmentsDir = attachmentsDir;
     this.deviceId = this.loadDeviceId();
   }
 
@@ -75,7 +79,7 @@ export class Context {
 
 export const ITEM_COLUMNS = `
   i.id, i.type, i.title, i.body, i.url, i.project_id, p.name AS project_name,
-  i.source, i.created_at, i.updated_at, i.archived_at,
+  i.source, i.metadata, i.created_at, i.updated_at, i.archived_at,
   t.status AS task_status, t.priority AS task_priority, t.due_at AS task_due_at, t.completed_at AS task_completed_at`;
 
 export const ITEM_JOINS = `
@@ -93,6 +97,7 @@ export interface ItemRow {
   project_id: string | null;
   project_name: string | null;
   source: string;
+  metadata: string;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
@@ -114,6 +119,7 @@ export function toItem(row: ItemRow): Item {
     url: row.url,
     project: row.project_id ? { id: row.project_id, name: row.project_name! } : null,
     source: row.source,
+    metadata: JSON.parse(row.metadata) as ItemMetadata,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     archivedAt: row.archived_at,

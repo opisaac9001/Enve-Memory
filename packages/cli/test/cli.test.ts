@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -42,6 +42,20 @@ test('capture, organize and find from the command line', () => {
   assert.match(cli(home, ['project', 'show', 'garage']).stdout, /## Instructions\nOffline only\.[\s\S]*## Memory\n# Goal/);
 });
 
+test('files are saved from paths and can be read back', () => {
+  const home = tempHome();
+  const path = join(home, 'wiring notes.md');
+  writeFileSync(path, '# Wiring\nGPIO4 drives the relay coil.');
+  const [saved] = json(home, ['file', path, '-t', 'wiring']);
+  assert.equal(saved.created, true);
+  assert.equal(saved.item.type, 'file');
+  assert.equal(saved.item.title, 'wiring notes.md');
+  assert.equal(cli(home, ['show', saved.item.id, '--content']).stdout, '# Wiring\nGPIO4 drives the relay coil.');
+  assert.equal(json(home, ['search', 'relay', 'coil'])[0].id, saved.item.id);
+  assert.equal(json(home, ['settings', 'fetchLinks', 'false']).fetchLinks, false);
+  assert.equal(json(home, ['link', 'https://example.com/never-fetched']).item.metadata.ingest, undefined);
+});
+
 test('errors are reported with distinct exit codes', () => {
   const home = tempHome();
   assert.equal(cli(home, ['show', 'nope']).code, 1);
@@ -67,7 +81,7 @@ test('connect prints a working command for each client', () => {
 test('an MCP client over stdio shares the same library as the CLI', async () => {
   const home = tempHome();
   json(home, ['project', 'new', 'Garage Door']);
-  json(home, ['link', 'https://example.com/ratgdo', '--title', 'ratgdo firmware', '-p', 'garage']);
+  json(home, ['link', 'https://example.com/ratgdo', '--title', 'ratgdo firmware', '-p', 'garage', '--no-fetch']);
 
   const client = new Client({ name: 'claude-code', version: '1.0.0' });
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [MAIN, 'mcp', '--home', home], stderr: 'pipe' }));

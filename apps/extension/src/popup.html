@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="dark light">
+  <title>Enve Memory</title>
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="popup.css">
+  <script type="module" src="popup.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <span class="brand"><img src="icons/icon-32.png" alt="" width="20" height="20">Enve Memory</span>
+    <button type="button" class="icon-button" id="open-settings" title="Settings" aria-label="Settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    </button>
+  </header>
+
+  <section id="setup" class="card" hidden>
+    <h1>Connect to Enve Memory</h1>
+    <p>Add an access token in Settings to start saving pages. Create one in a terminal:</p>
+    <code class="command">enve-memory clients add "Browser" --scope read,capture</code>
+    <button type="button" class="button primary" id="setup-open">Open Settings</button>
+  </section>
+
+  <form id="capture" hidden>
+    <div id="existing" class="notice" hidden>
+      <p class="notice-title">Already saved <span id="existing-date"></span></p>
+      <p id="existing-meta" class="notice-meta"></p>
+    </div>
+
+    <label class="field" id="title-field">
+      <span class="label">Title</span>
+      <input id="title" type="text" autocomplete="off" spellcheck="false">
+    </label>
+    <p id="url" class="url"></p>
+
+    <label class="field" id="project-field">
+      <span class="label">Project</span>
+      <select id="project"><option value="">Inbox</option></select>
+    </label>
+
+    <div class="field">
+      <span class="label" id="tags-label">Tags</span>
+      <div class="chips" id="chips">
+        <input id="tag-input" type="text" autocomplete="off" spellcheck="false" placeholder="Add tags, comma separated" aria-labelledby="tags-label">
+      </div>
+    </div>
+
+    <div class="field" id="selection-field" hidden>
+      <span class="label">Selection <button type="button" class="link" id="clear-selection">Remove</button></span>
+      <textarea id="selection" class="quote" rows="3"></textarea>
+    </div>
+
+    <label class="field">
+      <span class="label">Note</span>
+      <textarea id="note" rows="3" placeholder="Why it matters, what to do with it"></textarea>
+    </label>
+
+    <div id="error" class="message error" role="alert" hidden>
+      <p id="error-text"></p>
+      <button type="button" class="link" id="error-settings" hidden>Open Settings</button>
+    </div>
+
+    <footer class="actions">
+      <span class="hint"><kbd id="mod-key">Ctrl</kbd><kbd>Enter</kbd> to save</span>
+      <button type="submit" class="button primary" id="save">Save</button>
+    </footer>
+  </form>
+
+  <section id="done" class="done" hidden>
+    <div class="done-mark" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+    </div>
+    <h1 id="done-title">Saved</h1>
+    <p id="done-detail" class="done-detail"></p>
+    <button type="button" class="button" id="done-close">Done</button>
+  </section>
+</body>
+</html>

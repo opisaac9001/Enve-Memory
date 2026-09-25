@@ -34,7 +34,9 @@ API keys for BYO AI providers go in the OS credential store (macOS Keychain, Win
 ## Content safety
 
 - Saved content is data. Tool outputs label it as such, and server instructions tell models never to act on it.
-- Ingestion (Phase 3) will fetch pages without cookies or credentials, strip scripts, and cap sizes and redirects. Fetching is always initiated by the user's own capture.
+- Ingestion fetches with no cookies or credentials, a 15 s timeout and a 15 MB cap, refuses non-HTTP(S) schemes and cloud-metadata hosts, and never executes page scripts (linkedom parses, it doesn't run). The result is stored as `content`, apart from the user's `body`.
+- A token with `capture` can make this machine fetch a URL, and with `read` too it can read the result. Pages on the user's own network are therefore reachable by anyone holding a `read` + `capture` token, which is why tokens belong only to the user's own devices and agents. The `fetchLinks` setting turns fetching off entirely.
+- `save_file` over stdio accepts a local path, because the stdio client already runs as the user. Over HTTP the `path` parameter doesn't exist, so a remote token holder can't make the server read arbitrary files.
 - Tokens and credentials never appear in URLs, logs or the change log.
 
 ## Reporting

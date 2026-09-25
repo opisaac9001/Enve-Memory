@@ -3,9 +3,11 @@ import {
   type Context, ITEM_COLUMNS, ITEM_FROM, type ItemRow, newId, normalizeTag, oneOf, required, toItem, toTaskFields,
 } from './context.ts';
 import { MemoryError, invalid, notFound } from './errors.ts';
+import { type AttachmentRow, removeBlobIfUnused, toAttachment } from './blobs.ts';
 import type { ProjectService } from './projects.ts';
+import type { SettingsService } from './settings.ts';
 import {
-  ITEM_TYPES, type Item, type ItemDetail, type ItemType, RELATION_KINDS, type RelatedItem, type RelationKind,
+  ITEM_TYPES, type Item, type ItemDetail, type ItemMetadata, type ItemType, RELATION_KINDS, type RelatedItem, type RelationKind,
 } from './types.ts';
 
 export interface ItemFilter {
@@ -20,8 +22,17 @@ export interface NewItem {
   title?: string;
   body?: string;
   url?: string | null;
+  content?: string;
+  metadata?: ItemMetadata;
   project?: string;
   tags?: string[];
+}
+
+export interface SourceUpdate {
+  /** Applied only when the item has no title yet; the user's own title always wins. */
+  title?: string;
+  content?: string;
+  metadata: ItemMetadata;
 }
 
 export interface SaveNoteInput {
@@ -37,6 +48,8 @@ export interface SaveLinkInput {
   note?: string;
   project?: string;
   tags?: string[];
+  /** Fetch and extract the page afterwards. Defaults to the library's fetchLinks setting. */
+  ingest?: boolean;
 }
 
 export interface UpdateItemInput {
@@ -59,9 +72,12 @@ export class ItemService {
   private readonly ctx: Context;
   private readonly projects: ProjectService;
 
-  constructor(ctx: Context, projects: ProjectService) {
+  private readonly settings: SettingsService;
+
+  constructor(ctx: Context, projects: ProjectService, settings: SettingsService) {
     this.ctx = ctx;
     this.projects = projects;
+    this.settings = settings;
   }
 
   saveNote(input: SaveNoteInput): ItemDetail {
@@ -86,6 +102,7 @@ export class ItemService {
     }
     const id = this.insert({
       type: 'bookmark', url, title: input.title, body: input.note, project: input.project, tags: input.tags,
+      metadata: (input.ingest ?? this.settings.get('fetchLinks')) ? { ingest: { status: 'pending' } } : {},
     });
     return { item: this.get(id), created: true };
   }
@@ -107,13 +124,15 @@ export class ItemService {
     const title = input.title?.trim() ?? '';
     const body = input.body?.trim() ?? '';
     const url = input.url ?? null;
+    const content = input.content ?? '';
+    const metadata = input.metadata ?? {};
     this.ctx.tx(() => {
       this.ctx.run(
-        `INSERT INTO items (id, type, title, body, url, project_id, source, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        id, input.type, title, body, url, projectId, this.ctx.actor, now, now,
+        `INSERT INTO items (id, type, title, body, url, content, metadata, project_id, source, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, input.type, title, body, url, content, JSON.stringify(metadata), projectId, this.ctx.actor, now, now,
       );
-      this.ctx.record('item', id, 'create', projectId, { type: input.type, title, body, url, projectId });
+      this.ctx.record('item', id, 'create', projectId, { type: input.type, title, body, url, content, metadata, projectId });
       if (tags.length) this.applyTags(id, projectId, tags, []);
     });
     return id;
@@ -136,7 +155,40 @@ export class ItemService {
         row.id, row.id,
       )
       .map((r) => ({ kind: r.kind, direction: r.direction, id: r.id, type: r.type, title: r.title }));
-    return { ...toItem(row), tags, task: toTaskFields(row), relations };
+    const { content } = this.ctx.get<{ content: string }>(`SELECT content FROM items WHERE id = ?`, row.id)!;
+    const attachments = this.ctx
+      .all<AttachmentRow>(`SELECT * FROM attachments WHERE item_id = ? ORDER BY created_at`, row.id)
+      .map(toAttachment);
+    return { ...toItem(row), content, attachments, tags, task: toTaskFields(row), relations };
+  }
+
+  /** Records what ingestion extracted from the item's source. Metadata is merged shallowly. */
+  setSource(id: string, update: SourceUpdate): ItemDetail {
+    const row = this.row(id);
+    const changes: Record<string, SQLInputValue> = {
+      metadata: JSON.stringify({ ...(JSON.parse(row.metadata) as ItemMetadata), ...update.metadata }),
+    };
+    if (update.content !== undefined) changes.content = update.content;
+    if (update.title?.trim() && !row.title) changes.title = update.title.trim();
+    this.write(row, changes, 'ingest', { ...changes, metadata: update.metadata });
+    return this.get(row.id);
+  }
+
+  /** Queues failed fetches/extractions for another attempt. Returns how many. */
+  retryFailedIngest(): number {
+    const failed = this.ctx.all<{ id: string }>(`SELECT id FROM items WHERE json_extract(metadata, '$.ingest.status') = 'failed'`);
+    for (const { id } of failed) this.setSource(id, { metadata: { ingest: { status: 'pending' } } });
+    return failed.length;
+  }
+
+  /** Oldest first, so a backlog drains in the order things were saved. */
+  pendingIngest(limit = 20): string[] {
+    return this.ctx
+      .all<{ id: string }>(
+        `SELECT id FROM items WHERE json_extract(metadata, '$.ingest.status') = 'pending' AND archived_at IS NULL ORDER BY seq LIMIT ?`,
+        limit,
+      )
+      .map((r) => r.id);
   }
 
   list(filter: ItemFilter = {}, limit?: number): Item[] {
@@ -182,10 +234,12 @@ export class ItemService {
   /** Permanent. Only exposed to the user directly, never to AI clients. */
   delete(id: string): void {
     const row = this.row(id);
+    const blobs = this.ctx.all<{ sha256: string }>(`SELECT sha256 FROM attachments WHERE item_id = ?`, row.id);
     this.ctx.tx(() => {
       this.ctx.run(`DELETE FROM items WHERE id = ?`, row.id);
       this.ctx.record('item', row.id, 'delete', row.project_id, { type: row.type, title: row.title });
     });
+    for (const { sha256 } of blobs) removeBlobIfUnused(this.ctx, sha256);
   }
 
   tag(id: string, { add = [], remove = [] }: { add?: string[]; remove?: string[] }): ItemDetail {

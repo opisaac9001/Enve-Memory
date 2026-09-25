@@ -1,0 +1,19 @@
+{
+  "name": "@enve-memory/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "icons": "node scripts/icons.mjs",
+    "test": "node --test \"test/*.test.mjs\"",
+    "test:e2e": "node scripts/build.mjs && node --test --test-concurrency=1 \"e2e/*.test.mjs\""
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}
