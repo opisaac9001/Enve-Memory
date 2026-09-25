@@ -21,7 +21,8 @@
     "dist:mac": "node scripts/dist.mjs --mac",
     "dist:win": "node scripts/dist.mjs --win",
     "dist:linux": "node scripts/dist.mjs --linux",
-    "verify:dist": "node scripts/verify-dist.mjs"
+    "verify:dist": "node scripts/verify-dist.mjs",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0"

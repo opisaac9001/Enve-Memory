@@ -12,7 +12,8 @@ import { type ElectronApplication, type Page, _electron as electron } from 'play
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repo = resolve(appDir, '..', '..');
 const cli = join(repo, 'packages', 'cli', 'src', 'main.ts');
-const shots = join(appDir, 'docs');
+// Debug captures only; the published screenshots come from scripts/screenshots.mjs.
+const shots = join(appDir, 'test-results', 'screenshots');
 const home = mkdtempSync(join(tmpdir(), 'enve-desktop-e2e-'));
 const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
 

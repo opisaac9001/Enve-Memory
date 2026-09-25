@@ -133,9 +133,12 @@ export function GraphView() {
     }
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
+    // Item labels crowd a big graph, so they appear as you zoom in; small graphs show them all.
+    const itemLabels = nodes.length <= 25 || view.k >= 2.2;
     for (const node of nodes) {
       const always = node.kind === 'project';
-      if (!always && node !== focus && view.k < 1.6) continue;
+      const visible = always || node === focus || (node.kind === 'tag' ? view.k >= 1.2 || itemLabels : itemLabels);
+      if (!visible) continue;
       ctx.font = `${always ? 600 : 400} ${(always ? 12 : 11) / view.k}px system-ui, sans-serif`;
       ctx.fillStyle = node === focus || always ? text : muted;
       const label = node.label.length > 48 ? `${node.label.slice(0, 47)}…` : node.label;

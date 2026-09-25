@@ -2,18 +2,18 @@
 
 Electron + React on top of the workspace packages. The app opens the same SQLite library as the CLI and MCP servers, hosts the local HTTP API (browser extension, phone, remote MCP), and runs the background workers: link archiving, the semantic index, optional AI enrichment, backups and folder sync.
 
-![Home](docs/home-dark.png)
+![Home](../../docs/screenshots/desktop/home.png)
 
 | | |
 |---|---|
-| ![Inbox with an AI suggestion](docs/inbox-dark.png) | ![Project briefing](docs/project-dark.png) |
-| ![Archived page in the item drawer](docs/item-detail-dark.png) | ![Search palette](docs/search-dark.png) |
-| ![Settings → AI tools](docs/settings-ai-tools-dark.png) | ![Settings → Devices with pairing QR codes](docs/settings-devices-dark.png) |
-| ![Graph](docs/graph-dark.png) | ![Ask with citations](docs/ask-dark.png) |
-| ![Reminders with snooze](docs/reminders-dark.png) | ![Search settings on an Intel Mac](docs/settings-search-unavailable-dark.png) |
-| ![Home, light theme](docs/home-light.png) | ![Project, light theme](docs/project-light.png) |
+| ![Project briefing: memory, open tasks](../../docs/screenshots/desktop/project.png) | ![The decision log, with a superseded decision](../../docs/screenshots/desktop/project-decisions.png) |
+| ![A saved page with its archived text, pin and reminder](../../docs/screenshots/desktop/item.png) | ![Inbox with an AI suggestion](../../docs/screenshots/desktop/inbox.png) |
+| ![⌘K search matching by meaning and by words](../../docs/screenshots/desktop/search.png) | ![The Watch shelf](../../docs/screenshots/desktop/shelves.png) |
+| ![Activity: which app or AI changed what](../../docs/screenshots/desktop/activity.png) | ![Graph](../../docs/screenshots/desktop/graph.png) |
+| ![Settings → AI tools](../../docs/screenshots/desktop/settings-ai-tools.png) | ![Settings → Devices with pairing codes](../../docs/screenshots/desktop/settings-devices.png) |
+| ![Home, light theme](../../docs/screenshots/desktop/home-light.png) | ![Project, light theme](../../docs/screenshots/desktop/project-light.png) |
 
-The screenshots are written by the E2E suite (`ask-dark.png` only when it runs against a real model, see below).
+`npm --prefix apps/desktop run screenshots` regenerates these images. It builds the app and a fresh demo library (`scripts/demo-library.ts`), then drives the real app at 1440×900 and 2× scale, writing to `docs/screenshots/desktop/`. A few values that would otherwise show this machine (its network addresses, a random port, development paths, the lab Ollama's address) are replaced with representative ones; everything else is the live app. `ask.png` is written only when the lab Ollama gives a cited answer that names the current decision (the ESP32-S3), and it isn't in the gallery yet. The E2E suite keeps its own debug captures in `test-results/`.
 
 ## Run it
 
@@ -24,7 +24,8 @@ npm --prefix apps/desktop run dev        # Vite dev server + Electron; renderer 
 npm --prefix apps/desktop run build      # dist/: main.js, preload.cjs, cli.mjs, renderer/
 npm --prefix apps/desktop run start      # run the built app
 npx tsc -p apps/desktop                  # typecheck (main, preload, renderer, tests)
-npm --prefix apps/desktop run dist:mac   # installer: release/Enve Memory-<version>-arm64.dmg
+npm --prefix apps/desktop run dist:mac   # installers: release/Enve Memory-<version>-{arm64,x64}.dmg
+npm --prefix apps/desktop run screenshots   # repository screenshots → docs/screenshots/desktop/
 ```
 
 ## Installers
