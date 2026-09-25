@@ -47,6 +47,18 @@ export interface ProjectRef {
 export const INGEST_STATUSES = ['pending', 'done', 'failed'] as const;
 export type IngestStatus = (typeof INGEST_STATUSES)[number];
 
+/** What an AI provider proposed for an item. Suggestions are never applied without the user. */
+export interface AiSuggestions {
+  status: 'done' | 'failed';
+  at: string;
+  model: string;
+  summary?: string;
+  tags?: string[];
+  project?: ProjectRef | null;
+  error?: string;
+  accepted?: boolean;
+}
+
 /** Facts about the source, filled in by ingestion. Open-ended so extractors can add fields without a migration. */
 export interface ItemMetadata {
   siteName?: string;
@@ -59,6 +71,7 @@ export interface ItemMetadata {
   pageCount?: number;
   finalUrl?: string;
   ingest?: { status: IngestStatus; at?: string; error?: string };
+  ai?: AiSuggestions;
   [key: string]: unknown;
 }
 

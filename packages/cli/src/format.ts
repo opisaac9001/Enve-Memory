@@ -1,3 +1,4 @@
+import type { Answer } from '@enve-memory/ai';
 import type { ApiClient, Change, Decision, Item, ItemDetail, Project, ProjectBriefing, SearchHit, Task } from '@enve-memory/core';
 
 const oneLine = (text: string, max = 80) => {
@@ -98,4 +99,19 @@ export function changeLine(change: Change): string {
 export function clientLine(client: ApiClient): string {
   const state = client.revokedAt ? '  [revoked]' : client.lastUsedAt ? `  last used ${client.lastUsedAt}` : '  never used';
   return `${client.name}  (${client.scopes.join(', ')})  ${client.tokenHint}${state}\n    ${client.id}`;
+}
+
+export function suggestions(item: ItemDetail): string {
+  const ai = item.metadata.ai;
+  if (!ai || ai.status !== 'done') return 'No suggestions.';
+  const lines = [`${label(item)}`, '', ai.summary ?? ''];
+  if (ai.tags?.length) lines.push('', `Suggested tags:    ${ai.tags.map((t) => `#${t}`).join(' ')}`);
+  if (ai.project) lines.push(`Suggested project: ${ai.project.name}`);
+  lines.push('', `Apply with: enve-memory accept ${item.id}`);
+  return lines.join('\n');
+}
+
+export function answer({ answer: text, sources }: Answer): string {
+  if (sources.length === 0) return text;
+  return `${text}\n\n${sources.map((s) => `[${s.n}] ${s.title || s.url || s.type}  ${s.id}`).join('\n')}`;
 }

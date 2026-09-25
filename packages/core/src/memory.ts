@@ -94,13 +94,17 @@ export class EnveMemory {
     return schemaVersion(this.db);
   }
 
-  stats(): { projects: number } & Record<ItemType, number> {
+  stats(): { projects: number; tags: number; tagNames: string[] } & Record<ItemType, number> {
     const counts = Object.fromEntries(ITEM_TYPES.map((type) => [type, 0])) as Record<ItemType, number>;
     for (const row of this.ctx.all<{ type: ItemType; n: number }>(`SELECT type, count(*) AS n FROM items GROUP BY type`)) {
       counts[row.type] = row.n;
     }
     const projects = this.ctx.get<{ n: number }>(`SELECT count(*) AS n FROM projects`)!.n;
-    return { projects, ...counts };
+    // Most-used first, so a capped list keeps the tags that matter.
+    const tagNames = this.ctx
+      .all<{ name: string }>(`SELECT t.name FROM tags t LEFT JOIN item_tags it ON it.tag_id = t.id GROUP BY t.id ORDER BY count(it.item_id) DESC, t.name`)
+      .map((r) => r.name);
+    return { projects, tags: tagNames.length, tagNames, ...counts };
   }
 
   /** Everything an agent needs to pick up a project where the last one left off. */

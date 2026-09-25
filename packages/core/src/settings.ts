@@ -7,9 +7,25 @@ export interface Settings {
   fetchLinks: boolean;
   /** Index items with the local embedding model so search matches meaning, not just words. */
   semanticSearch: boolean;
+  /** 'none' or a provider id from @enve-memory/ai. */
+  aiProvider: string;
+  aiModel: string;
+  /** Empty means the provider's standard address. */
+  aiBaseUrl: string;
+  /** Summarize and suggest tags/projects for new items. Only items saved after `aiEnrichSince` are sent, so turning it on never bills a backlog. */
+  aiEnrich: boolean;
+  aiEnrichSince: string;
 }
 
-const DEFAULTS: Settings = { fetchLinks: true, semanticSearch: true };
+const DEFAULTS: Settings = {
+  fetchLinks: true,
+  semanticSearch: true,
+  aiProvider: 'none',
+  aiModel: '',
+  aiBaseUrl: '',
+  aiEnrich: false,
+  aiEnrichSince: '',
+};
 
 export class SettingsService {
   private readonly ctx: Context;

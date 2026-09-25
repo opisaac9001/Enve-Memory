@@ -11,7 +11,7 @@
 | 3c | Semantic search: local MiniLM embeddings, chunked vector index, hybrid RRF with a relevance floor, background indexer, `index` CLI, retrieval eval | ✅ 2026-09-24 |
 | 2b | Desktop shell (Electron vs Tauri decided here) with Home, Inbox, Library, Projects, Tasks, Search, Settings, Connected clients | |
 | 3 | Capture and understanding: URL ingestion (readable Markdown + metadata), browser extension (Chrome/Edge/Firefox/Safari), clipboard and drag-drop, PDFs and images as attachments, local embeddings, hybrid search | |
-| 4 | Optional AI enrichment through BYO providers: summaries, tag and project suggestions, relationship suggestions. "None" stays first-class | |
+| 4 | Optional AI through BYO providers (Anthropic SDK, OpenAI-compatible, OpenRouter, Ollama, Gemini): summaries + tag/project suggestions with accept, background enrichment of new items only, cited `ask` over the library | ✅ 2026-09-24 |
 | 5a | Backups (hourly/daily/monthly rotation, verified restore with undo, 30-day attachment trash), Export Everything (Markdown + JSON + files) | ✅ 2026-09-24 |
 | 5b | Installers for macOS/Windows/Linux | |
 | 6 | iOS companion: SwiftUI app + share extension, capture and search first | |

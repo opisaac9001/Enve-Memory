@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type ParseArgsConfig, parseArgs } from 'node:util';
 import { EnveMemory, MemoryError, type Settings, defaultHome, listBackups, pathsFor, restoreBackup } from '@enve-memory/core';
+import { AiError, type AiProvider, PROVIDERS, PROVIDER_IDS, ask, createProvider, enrichItem, enrichWorker, envKeys, isProviderId, providerFor } from '@enve-memory/ai';
 import { attachLocalEmbedder, indexWorker } from '@enve-memory/embeddings';
 import { ingestItem, processPending } from '@enve-memory/ingestion';
 import { DEFAULT_PORT, createApiServer, lanUrls, pairingLink } from '@enve-memory/api';
@@ -57,6 +58,17 @@ AI clients and devices
   clients list                 List API clients
   clients revoke <id>          Revoke a token immediately
 
+AI (optional; bring your own provider)
+  ai                           Show the AI provider and enrichment status
+  ai use <provider>            ollama | openai | anthropic | gemini | openrouter | openai-compatible  [--model] [--base-url]
+                               Keys come from OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or OPENROUTER_API_KEY
+  ai models                    List the provider's models
+  ai off                       Turn AI off
+  ai enrich on|off             Summarize and suggest tags/projects for items saved from now on
+  enrich <id>                  Summarize one item and suggest tags and a project now
+  accept <id>                  Apply an item's suggested tags and project
+  ask <question…>              Answer from your library with numbered citations  [-p project]
+
 Your data
   export <folder>              Write everything as Markdown + JSON (plus original files)
   backup                       Take a snapshot now
@@ -105,6 +117,8 @@ const { values: opts, positionals } = parseCommandLine({
     port: { type: 'string' },
     lan: { type: 'boolean' },
     'no-fetch': { type: 'boolean' },
+    model: { type: 'string' },
+    'base-url': { type: 'string' },
     content: { type: 'boolean' },
     retry: { type: 'boolean' },
     limit: { type: 'string' },
@@ -261,6 +275,23 @@ async function run(memory: EnveMemory): Promise<void> {
     }
     case 'clients':
       return runClients(memory);
+    case 'ai':
+      return runAi(memory);
+    case 'enrich': {
+      const item = await enrichItem(memory, requireProvider(memory), arg(0, 'id'));
+      const ai = item.metadata.ai!;
+      if (ai.status === 'failed') throw new MemoryError('invalid', ai.error ?? 'Enrichment failed.');
+      return emit(item, format.suggestions(item));
+    }
+    case 'accept': {
+      const item = memory.items.acceptSuggestions(arg(0, 'id'));
+      return emit(item, format.itemDetail(item));
+    }
+    case 'ask': {
+      attachLocalEmbedder(memory);
+      const answer = await ask(memory, requireProvider(memory), text(0, 'question'), { project: opts.project });
+      return emit(answer, format.answer(answer));
+    }
     case 'export': {
       const summary = memory.exports.write(resolve(text(0, 'folder')));
       return emit(summary, `Exported ${summary.items} items, ${summary.projects} projects and ${summary.files} files to ${summary.path}`);
@@ -278,13 +309,15 @@ async function run(memory: EnveMemory): Promise<void> {
     case 'project':
       return runProject(memory);
     case 'info': {
+      const { tagNames: _tagNames, ...stats } = memory.stats();
       const info = {
         version: pkg.version,
         home: memory.paths?.home,
         database: memory.paths?.database,
         schemaVersion: memory.schemaVersion,
         deviceId: memory.deviceId,
-        ...memory.stats(),
+        ...stats,
+        ai: memory.settings.get('aiProvider'),
         semanticIndex: (() => {
           const embedder = attachLocalEmbedder(memory);
           if (!embedder) return 'off';
@@ -297,6 +330,55 @@ async function run(memory: EnveMemory): Promise<void> {
     default:
       throw new UsageError(`Unknown command "${command}".`);
   }
+}
+
+function requireProvider(memory: EnveMemory): AiProvider {
+  const provider = providerFor(memory);
+  if (!provider) throw new UsageError('No AI provider is set up. Choose one with `enve-memory ai use <provider>`.');
+  return provider;
+}
+
+async function runAi(memory: EnveMemory): Promise<void> {
+  const [sub, value] = rest;
+  switch (sub) {
+    case undefined:
+      break;
+    case 'use': {
+      if (!value || !isProviderId(value) || value === 'none') throw new UsageError(`Choose a provider: ${PROVIDER_IDS.filter((p) => p !== 'none').join(', ')}.`);
+      const provider = createProvider({ provider: value, model: opts.model ?? PROVIDERS[value].defaultModel ?? '', baseUrl: opts['base-url'], apiKey: envKeys(value) });
+      memory.settings.set('aiProvider', value);
+      memory.settings.set('aiModel', provider.model);
+      memory.settings.set('aiBaseUrl', opts['base-url'] ?? '');
+      break;
+    }
+    case 'off':
+      memory.settings.set('aiProvider', 'none');
+      memory.settings.set('aiEnrich', false);
+      break;
+    case 'models': {
+      const models = await requireProvider(memory).listModels();
+      return emit(models, models.join('\n'));
+    }
+    case 'enrich':
+      if (value !== 'on' && value !== 'off') throw new UsageError('Usage: ai enrich on|off');
+      if (value === 'on') requireProvider(memory);
+      memory.settings.set('aiEnrich', value === 'on');
+      if (value === 'on') memory.settings.set('aiEnrichSince', new Date().toISOString());
+      break;
+    default:
+      throw new UsageError('Usage: ai [use|models|off|enrich]');
+  }
+  const settings = memory.settings.all();
+  const status = {
+    provider: settings.aiProvider,
+    model: settings.aiModel || null,
+    baseUrl: settings.aiBaseUrl || null,
+    enrich: settings.aiEnrich,
+    enrichSince: settings.aiEnrichSince || null,
+  };
+  return emit(status, settings.aiProvider === 'none'
+    ? 'AI is off. Everything else works without it. Turn it on with `enve-memory ai use <provider>`.'
+    : `Provider  ${settings.aiProvider}${settings.aiBaseUrl ? ` at ${settings.aiBaseUrl}` : ''}\nModel     ${settings.aiModel}\nEnrich    ${settings.aiEnrich ? `on (items saved since ${settings.aiEnrichSince})` : 'off'}`);
 }
 
 function runClients(memory: EnveMemory): void {
@@ -335,10 +417,25 @@ async function serve(): Promise<void> {
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new UsageError(`Invalid port "${opts.port}".`);
   const embedder = attachLocalEmbedder(memory);
   const indexer = embedder ? indexWorker(memory, embedder) : null;
-  const api = createApiServer(memory, { version: pkg.version, port, lan: opts.lan, afterWrite: () => indexer?.kick() });
+  const enricher = enrichWorker(memory, () => {
+    try {
+      return providerFor(memory);
+    } catch (error) {
+      console.error('enrich:', (error as Error).message);
+      return null;
+    }
+  });
+  const api = createApiServer(memory, {
+    version: pkg.version, port, lan: opts.lan,
+    afterWrite: () => {
+      indexer?.kick();
+      enricher.kick();
+    },
+  });
   const url = await api.listen();
   api.ingest.kick();
   indexer?.kick();
+  enricher.kick();
   const backup = () => {
     try {
       memory.backups.runSchedule();
@@ -353,6 +450,7 @@ async function serve(): Promise<void> {
     clearInterval(backupTimer);
     await api.close();
     await indexer?.idle();
+    await enricher.idle();
     memory.close();
     process.exit(0);
   };
@@ -501,7 +599,7 @@ function fail(error: unknown): void {
   if (error instanceof UsageError) {
     console.error(`${error.message}\nRun \`enve-memory --help\` for usage.`);
     process.exitCode = 2;
-  } else if (error instanceof MemoryError) {
+  } else if (error instanceof MemoryError || error instanceof AiError) {
     console.error(`error: ${error.message}`);
     process.exitCode = 1;
   } else if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') {

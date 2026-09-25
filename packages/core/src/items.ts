@@ -7,7 +7,7 @@ import { type AttachmentRow, removeBlobIfUnused, toAttachment } from './blobs.ts
 import type { ProjectService } from './projects.ts';
 import type { SettingsService } from './settings.ts';
 import {
-  ITEM_TYPES, type Item, type ItemDetail, type ItemMetadata, type ItemType, RELATION_KINDS, type RelatedItem, type RelationKind,
+  type AiSuggestions, ITEM_TYPES, type Item, type ItemDetail, type ItemMetadata, type ItemType, RELATION_KINDS, type RelatedItem, type RelationKind,
 } from './types.ts';
 
 export interface ItemFilter {
@@ -178,6 +178,43 @@ export class ItemService {
     if (update.title?.trim() && !row.title) changes.title = update.title.trim();
     this.write(row, changes, 'ingest', { ...changes, metadata: update.metadata });
     return this.get(row.id);
+  }
+
+  /** Records AI suggestions (summary, tags, project) for an item without applying them. */
+  suggest(id: string, ai: AiSuggestions): ItemDetail {
+    const row = this.row(id);
+    const metadata = { ...(JSON.parse(row.metadata) as ItemMetadata), ai };
+    this.write(row, { metadata: JSON.stringify(metadata) }, 'enrich', { ai });
+    return this.get(row.id);
+  }
+
+  /** Applies an item's suggested tags, and its suggested project when it has none. */
+  acceptSuggestions(id: string): ItemDetail {
+    const item = this.get(id);
+    const ai = item.metadata.ai;
+    if (!ai || ai.status !== 'done') throw invalid('This item has no suggestions to accept.');
+    this.ctx.tx(() => {
+      if (ai.tags?.length) this.tag(item.id, { add: ai.tags });
+      if (ai.project && !item.project) this.update(item.id, { project: ai.project.id });
+      const row = this.row(item.id);
+      this.write(row, { metadata: JSON.stringify({ ...(JSON.parse(row.metadata) as ItemMetadata), ai: { ...ai, accepted: true } }) }, 'accept');
+    });
+    return this.get(item.id);
+  }
+
+  /** Saved since `since`, readable, and not yet enriched; oldest first. */
+  pendingEnrichment(since: string, limit = 20): string[] {
+    if (!since) return [];
+    return this.ctx
+      .all<{ id: string }>(
+        `SELECT id FROM items
+         WHERE created_at >= ? AND archived_at IS NULL AND type IN ('note', 'bookmark', 'file', 'image')
+           AND json_extract(metadata, '$.ai') IS NULL
+           AND coalesce(json_extract(metadata, '$.ingest.status'), 'done') != 'pending'
+         ORDER BY seq LIMIT ?`,
+        since, limit,
+      )
+      .map((r) => r.id);
   }
 
   /** Queues failed fetches/extractions for another attempt. Returns how many. */

@@ -78,6 +78,18 @@ SQLite runs in WAL mode with a 5 s busy timeout. The desktop app, a CLI invocati
 
 `save → (pending) → fetch or read file → extract → setSource(title if empty, content, metadata) → index`. Saving never waits on the network: the CLI and MCP `save_link` wait up to 10 s so the user or model sees the real title, the API returns at once and a background `IngestWorker` finishes the job, and failures are recorded on the item (`metadata.ingest.status = failed`) for `enve-memory ingest --retry`. The `fetchLinks` setting turns all fetching off. Deterministic steps never depend on AI. A bookmark keeps its URL plus cleaned Markdown (and optionally the original HTML), so it outlives the page. Capture clients such as the browser extension and the share sheet send only `{url, title, selection, note}`. All extraction logic lives once, in the desktop process.
 
-## AI providers (Phase 4)
+## AI providers (`packages/ai`)
 
-One interface (`complete`, `stream`, `embed`, `models`) with OpenAI, Anthropic, Gemini, Ollama and OpenAI-compatible implementations. Secrets go in the OS credential store. "None" is a first-class choice.
+Optional. With AI off (the default), everything else still works: capture, search including semantic, MCP, the API, backups.
+
+- **One interface:** `complete({system, prompt, schema?, maxTokens?})` and `listModels()`.
+- **Implementations:**
+  - Anthropic uses the official `@anthropic-ai/sdk`, defaulting to `claude-opus-5` at `effort: low` with JSON-schema output and server-side refusal fallbacks (`fallbacks: "default"`).
+  - OpenAI, OpenRouter and any OpenAI-compatible server (LM Studio, vLLM, llama.cpp) use Chat Completions with `json_schema`.
+  - Ollama uses native `/api/chat` with `format` = schema. `num_ctx` and `num_predict` are sized to each request, because Ollama silently truncates from the start of long prompts.
+  - Gemini uses `generateContent` with `responseJsonSchema`.
+- **Reasoning models:** thinking inlined as `<think>` is stripped. Schema output that LM Studio returns in `reasoning_content` is accepted.
+- **Enrichment:** a 2–3 sentence summary, up to 5 tags (existing ones preferred) and one existing project, stored as `metadata.ai` suggestions. They are applied only on `accept`. The worker only sends items saved after enrichment was turned on (`aiEnrichSince`), so enabling it never bills a backlog.
+- **Ask:** hybrid search → top 8 items → for each, the passages that share the most (IDF-weighted, lightly stemmed) terms with the question → an answer with numbered citations.
+- **Prompt injection:** item text is wrapped in `<item>` / `<source>` tags, and the system prompts say it's material to describe, never instructions. Suggestions are data the user reviews. Nothing the model says executes anything.
+- **Keys:** the CLI reads `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` or `OPENAI_COMPATIBLE_API_KEY`. The desktop app keeps keys in the OS credential store. Keys are never written to SQLite.
