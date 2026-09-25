@@ -4,7 +4,7 @@ Enve Memory holds a person's notes, links and project history, and gives AI agen
 
 ## Reporting a vulnerability
 
-Please report privately rather than in a public issue: use GitHub's **Report a vulnerability** button on this repository's Security tab (private vulnerability reporting). Include:
+Please report privately rather than in a public issue: message the maintainer, [@opisaac9001](https://github.com/opisaac9001), on GitHub (once the repository is public, use **Report a vulnerability** on the Security tab). Include:
 
 - what an attacker can do, and under which setup (stdio MCP, the local HTTP API with or without `--lan`, the browser extension, sync)
 - steps or a proof of concept
