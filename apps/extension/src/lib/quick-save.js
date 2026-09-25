@@ -1,31 +1,30 @@
-import { buildCapturePayload, createClient, describeError } from './api.js';
+import { buildCapturePayload, describeError } from './api.js';
+import { ERROR_COLOR, OK_COLOR, flashBadge } from './badge.js';
 import { ext } from './browser.js';
+import { saveCapture } from './outbox.js';
 import { readLinkText, readSelection } from './page.js';
-import { loadSettings } from './settings.js';
-
-const BADGE_MS = 2000;
-const OK_COLOR = '#F5921A';
-const ERROR_COLOR = '#D93A2B';
+import { connect } from './settings.js';
 
 /**
  * Saves without opening the popup. `kind` is `page`, `selection` or `link`; `info` is the context-menu click data
  * (or `{}` for the keyboard command).
  */
 export async function quickSave(kind, info, tab) {
-  const { serverUrl, token, lastProject } = await loadSettings();
-  if (!token) {
+  const { settings, client } = await connect();
+  if (!client) {
     await flashBadge(tab?.id, '!', ERROR_COLOR);
     await ext.runtime.openOptionsPage();
     return;
   }
   try {
-    const payload = buildCapturePayload({ ...(await captureFields(kind, info, tab)), project: lastProject?.id });
-    const { item, created } = await createClient({ serverUrl, token }).capture(payload);
+    const payload = buildCapturePayload({ ...(await captureFields(kind, info, tab)), project: settings.lastProject?.id });
+    const result = await saveCapture(client, payload, settings.serverUrl);
     await flashBadge(tab?.id, '✓', OK_COLOR);
-    notify(created ? 'Saved' : 'Updated', `${item.title || item.url || 'Note'} · ${item.project?.name ?? 'Inbox'}`);
+    if (result.queued) notify('Saved offline', `${payload.title || payload.url || 'Note'} will sync when Enve Memory is back.`);
+    else notify(result.created ? 'Saved' : 'Updated', `${result.item.title || result.item.url || 'Note'} · ${result.item.project?.name ?? 'Inbox'}`);
   } catch (error) {
     await flashBadge(tab?.id, '!', ERROR_COLOR);
-    notify("Couldn't save", describeError(error, serverUrl));
+    notify("Couldn't save", describeError(error, settings.serverUrl));
   }
 }
 
@@ -47,14 +46,7 @@ async function captureFields(kind, info, tab) {
   }
 }
 
-async function flashBadge(tabId, text, color) {
-  if (tabId === undefined) return;
-  await ext.action.setBadgeBackgroundColor({ tabId, color });
-  await ext.action.setBadgeTextColor({ tabId, color: '#FFFFFF' });
-  await ext.action.setBadgeText({ tabId, text });
-  setTimeout(() => ext.action.setBadgeText({ tabId, text: '' }).catch(() => {}), BADGE_MS);
-}
-
-function notify(title, message) {
-  ext.notifications.create({ type: 'basic', iconUrl: ext.runtime.getURL('icons/icon-128.png'), title, message }).catch(() => {});
+export function notify(title, message, id) {
+  const options = { type: 'basic', iconUrl: ext.runtime.getURL('icons/icon-128.png'), title, message };
+  return (id ? ext.notifications.create(id, options) : ext.notifications.create(options)).catch(() => {});
 }

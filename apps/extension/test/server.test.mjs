@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { createClient, describeError } from '../src/lib/api.js';
+import { bookmarkEntries, importEntries } from '../src/lib/bookmarks.js';
 import { startScratchServer } from './support/scratch-server.mjs';
 
 describe('client against a real enve-memory serve', () => {
@@ -77,6 +78,67 @@ describe('client against a real enve-memory serve', () => {
   test('a read-only token cannot capture', async () => {
     const readOnly = createClient({ serverUrl: server.url, token: await server.token('Reader', 'read') });
     await assert.rejects(readOnly.capture({ url: 'https://example.com/y' }), { code: 'insufficient_scope', status: 403 });
+  });
+
+  test('whoami works for a capture-only token', async () => {
+    const captureOnly = createClient({ serverUrl: server.url, token: await server.token('Capture only', 'capture') });
+    assert.deepEqual((await captureOnly.whoami()).scopes, ['capture']);
+  });
+
+  test('capture sets intent, reminder and pin; shelves and reminders find them', async () => {
+    const past = new Date(Date.now() - 60_000).toISOString();
+    const { item } = await client.capture({ url: 'https://example.com/watch-later', title: 'Talk', intent: 'watch', remind: past, pinned: true });
+    assert.equal(item.intent, 'watch');
+    assert.ok(item.pinnedAt);
+    assert.equal(item.remindAt, past);
+
+    const ids = (list) => list.map((i) => i.id);
+    assert.ok(ids(await client.items({ intent: 'watch' })).includes(item.id));
+    assert.ok(ids(await client.items({ pinned: true })).includes(item.id));
+    assert.ok(ids(await client.items({ reminders: true })).includes(item.id));
+    assert.ok(ids(await client.items({ unopened: 0 })).includes(item.id));
+    assert.ok(ids(await client.dueReminders()).includes(item.id));
+
+    await client.opened(item.id);
+    assert.ok(!ids(await client.items({ unopened: 0 })).includes(item.id));
+    assert.ok((await client.item(item.id)).openedAt);
+  });
+
+  test('write-scope edits: unpin, intent, reminder; accept without suggestions is a readable 400', async () => {
+    const writer = createClient({ serverUrl: server.url, token: await server.token('Writer', 'read,write') });
+    const { item } = await writer.capture({ url: 'https://example.com/editable', pinned: true, remind: 'tomorrow' });
+    assert.equal((await writer.pin(item.id, false)).pinnedAt, null);
+    assert.equal((await writer.setIntent(item.id, 'buy')).intent, 'buy');
+    assert.equal((await writer.setReminder(item.id, null)).remindAt, null);
+    await assert.rejects(writer.accept(item.id), (error) => error.status === 400 && /no suggestions/.test(describeError(error)));
+    await assert.rejects(client.pin(item.id, true), { code: 'insufficient_scope' });
+  });
+
+  test('search and related', async () => {
+    await client.capture({ url: 'https://example.com/rolling-codes', title: 'Rolling codes explained' });
+    const hits = await client.search('rolling');
+    assert.ok(hits.some((h) => h.title === 'Rolling codes explained' && h.match === 'keyword'));
+    const related = await client.related('https://example.com/unsaved-page', 'rolling codes garage', 5);
+    assert.ok(related.some((h) => h.title === 'Rolling codes explained'));
+    const self = await client.related('https://example.com/rolling-codes', 'rolling', 5);
+    assert.ok(!self.some((h) => h.url === 'https://example.com/rolling-codes'));
+  });
+
+  test('bookmark import through /capture/batch: created, already saved and failed, and a replayed chunk', async () => {
+    const tree = [{ id: '0', title: '', children: [{ id: '1', title: 'Bookmarks bar', children: [
+      { id: '2', title: 'Garage Door', children: [
+        { id: '3', title: 'Security+', url: 'https://example.com/security-plus-2' },
+        { id: '4', title: 'Opener manual', url: 'https://example.com/manual' },
+      ] },
+    ] }] }];
+    const entries = [...bookmarkEntries(tree), { url: 'https://example.com/x', project: 'no-such-project' }];
+    const totals = await importEntries(client, entries, { runId: 'server-test', size: 2 });
+    assert.deepEqual({ created: totals.created, skipped: totals.skipped, failed: totals.failed }, { created: 1, skipped: 1, failed: 1 });
+    assert.deepEqual((await client.lookup('https://example.com/security-plus-2')).tags, ['esp32', 'garage', 'garage-door', 'protocol']);
+    assert.deepEqual((await client.lookup('https://example.com/manual')).tags, ['garage-door']);
+
+    const replay = await importEntries(client, entries, { runId: 'server-test', size: 2 });
+    assert.deepEqual({ created: replay.created, skipped: replay.skipped, failed: replay.failed }, { created: 1, skipped: 1, failed: 1 });
   });
 
   test('a stopped server reads as offline', async () => {

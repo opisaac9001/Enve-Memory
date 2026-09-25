@@ -5,10 +5,11 @@ import {
   DEFAULT_SERVER_URL,
   buildCapturePayload,
   canCapture,
+  isRetryable,
+  queryString,
   createClient,
   describeError,
   isCapturableUrl,
-  isLoopback,
   normalizeServerUrl,
   originPattern,
   parseTags,
@@ -27,14 +28,6 @@ describe('server URLs and permissions', () => {
     for (const input of ['', '   ', undefined, 'http://', 'ftp://host', 'file:///etc', 'chrome-extension://abc']) {
       assert.equal(normalizeServerUrl(input), null, String(input));
     }
-  });
-
-  test('isLoopback recognises every loopback name the server accepts', () => {
-    assert.ok(isLoopback(DEFAULT_SERVER_URL));
-    assert.ok(isLoopback('http://localhost:49231'));
-    assert.ok(isLoopback('http://[::1]:49231'));
-    assert.ok(!isLoopback('http://192.168.1.20:49231'));
-    assert.ok(!isLoopback('https://memory.tail1234.ts.net'));
   });
 
   test('originPattern drops the port so it matches the manifest host permissions', () => {
@@ -96,6 +89,21 @@ describe('capture payloads', () => {
     });
   });
 
+  test('buildCapturePayload passes intent, reminder and pin, and drops unknown intents', () => {
+    assert.deepEqual(buildCapturePayload({ url: 'https://a.test/', intent: 'watch', remind: '2026-09-26T09:00:00.000Z', pinned: true }), {
+      url: 'https://a.test/',
+      intent: 'watch',
+      remind: '2026-09-26T09:00:00.000Z',
+      pinned: true,
+    });
+    assert.deepEqual(buildCapturePayload({ url: 'https://a.test/', intent: 'someday', remind: null, pinned: false }), { url: 'https://a.test/' });
+  });
+
+  test('queryString skips empty values and encodes the rest', () => {
+    assert.equal(queryString({ q: 'garage door', project: undefined, pinned: true, unopened: 30, inbox: false, tag: '' }), '?q=garage+door&pinned=true&unopened=30');
+    assert.equal(queryString({}), '');
+  });
+
   test('canCapture honours write implying capture', () => {
     assert.ok(canCapture(['read', 'capture']));
     assert.ok(canCapture(['write']));
@@ -130,6 +138,8 @@ describe('errors', () => {
       [new ApiError('forbidden_host', 'x', 403), /--lan/],
       [new ApiError('forbidden_origin', 'x', 403), /refused this browser extension/],
       [new ApiError('too_large', 'x', 413), /shorter selection/],
+      [new ApiError('locked', 'x', 423), /busy with an import or restore/],
+      [new ApiError('in_progress', 'x', 409), /still handling/],
       [new ApiError('not_found', 'No project matches "garage".', 404), /^No project matches "garage"\.$/],
       [new ApiError('internal', 'Internal error.', 500), /internal error/],
       [new ApiError('bad_response', 'Unexpected response (HTTP 418).', 418), /HTTP 418/],
@@ -137,6 +147,12 @@ describe('errors', () => {
     for (const [error, pattern] of cases) assert.match(describeError(error, url), pattern, error.code);
     assert.match(describeError(new TypeError('boom')), /Something went wrong/);
   });
+});
+
+test('isRetryable covers an absent, busy or still-working server only', () => {
+  for (const code of ['offline', 'timeout', 'locked', 'in_progress']) assert.ok(isRetryable(new ApiError(code, '')), code);
+  for (const code of ['unauthorized', 'invalid', 'not_found', 'internal']) assert.ok(!isRetryable(new ApiError(code, '')), code);
+  assert.ok(!isRetryable(new TypeError('x')));
 });
 
 describe('client over a fake fetch', () => {
@@ -153,13 +169,14 @@ describe('client over a fake fetch', () => {
         return respond(201, { item: { id: 'i1' }, created: true })();
       },
     });
-    const result = await client.capture({ url: 'https://a.test/' });
+    const result = await client.capture({ url: 'https://a.test/' }, { idempotencyKey: 'key-1' });
     assert.deepEqual(result, { item: { id: 'i1' }, created: true });
     assert.equal(calls[0].url, 'http://127.0.0.1:1/api/v1/capture');
     assert.equal(calls[0].init.method, 'POST');
     assert.equal(calls[0].init.headers.Authorization, 'Bearer em_secret');
     assert.equal(calls[0].init.body, '{"url":"https://a.test/"}');
     assert.equal(calls[0].init.credentials, 'omit');
+    assert.equal(calls[0].init.headers['Idempotency-Key'], 'key-1');
   });
 
   test('status is unauthenticated and lookup encodes the URL', async () => {

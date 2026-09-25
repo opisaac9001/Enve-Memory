@@ -2,7 +2,9 @@ export const DEFAULT_SERVER_URL = 'http://127.0.0.1:49231';
 export const TOKEN_COMMAND = 'enve-memory clients add "Browser" --scope read,capture';
 export const SERVE_COMMAND = 'enve-memory serve';
 
-const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
+export const INTENTS = ['read', 'watch', 'buy', 'revisit'];
+
+const RETRYABLE = new Set(['offline', 'timeout', 'locked', 'in_progress']);
 const REQUEST_TIMEOUT_MS = 8000;
 
 /** `code` is the server's error code, or `offline` / `timeout` / `not_enve` / `bad_response` for client-side failures. */
@@ -27,10 +29,6 @@ export function normalizeServerUrl(input) {
   } catch {
     return null;
   }
-}
-
-export function isLoopback(serverUrl) {
-  return LOOPBACK_HOSTS.has(new URL(serverUrl).hostname);
 }
 
 /** Host-permission match pattern for a server. Match patterns ignore the port, so one grant covers every port on that host. */
@@ -62,8 +60,13 @@ export function canCapture(scopes) {
   return scopes.includes('capture') || scopes.includes('write');
 }
 
+/** Failures worth retrying later with the same Idempotency-Key: the server is away, busy, or still handling the first try. */
+export function isRetryable(error) {
+  return error instanceof ApiError && RETRYABLE.has(error.code);
+}
+
 /** Builds a `/capture` body, dropping empty fields so the server applies its own defaults. */
-export function buildCapturePayload({ url, title, selection, note, project, tags } = {}) {
+export function buildCapturePayload({ url, title, selection, note, project, tags, intent, remind, pinned } = {}) {
   const payload = {};
   if (isCapturableUrl(url)) payload.url = url;
   const trimmedTitle = title?.trim();
@@ -74,7 +77,21 @@ export function buildCapturePayload({ url, title, selection, note, project, tags
   if (project) payload.project = project;
   const tagList = Array.isArray(tags) ? parseTags(tags.join(',')) : parseTags(tags);
   if (tagList.length) payload.tags = tagList;
+  if (INTENTS.includes(intent)) payload.intent = intent;
+  if (remind) payload.remind = remind;
+  if (pinned) payload.pinned = true;
   return payload;
+}
+
+/** Query string from a params object, skipping empty values. */
+export function queryString(params) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '' || value === false) continue;
+    search.set(key, String(value));
+  }
+  const text = search.toString();
+  return text ? `?${text}` : '';
 }
 
 /** Maps a non-2xx response to an ApiError, keeping the server's `{error:{code,message}}` when present. */
@@ -105,6 +122,10 @@ export function describeError(error, serverUrl = DEFAULT_SERVER_URL) {
       return 'Enve Memory refused this browser extension. Update Enve Memory and try again.';
     case 'too_large':
       return 'That is too much to save at once. Try a shorter selection.';
+    case 'locked':
+      return 'Enve Memory is busy with an import or restore. Try again in a moment.';
+    case 'in_progress':
+      return 'Enve Memory is still handling this save. Try again in a moment.';
     case 'invalid':
     case 'not_found':
     case 'conflict':
@@ -117,10 +138,11 @@ export function describeError(error, serverUrl = DEFAULT_SERVER_URL) {
 }
 
 export function createClient({ serverUrl, token, fetch = globalThis.fetch, timeoutMs = REQUEST_TIMEOUT_MS }) {
-  async function request(method, path, { body, auth = true } = {}) {
+  async function request(method, path, { body, auth = true, idempotencyKey } = {}) {
     const headers = { Accept: 'application/json' };
     if (auth) headers.Authorization = `Bearer ${token}`;
     if (body !== undefined) headers['Content-Type'] = 'application/json';
+    if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
     let response;
     try {
       response = await fetch(`${serverUrl}/api/v1${path}`, {
@@ -141,6 +163,8 @@ export function createClient({ serverUrl, token, fetch = globalThis.fetch, timeo
     return data;
   }
 
+  const item = (id, action) => `/items/${encodeURIComponent(id)}/${action}`;
+
   return {
     async status() {
       const data = await request('GET', '/status', { auth: false }).catch((error) => {
@@ -151,7 +175,19 @@ export function createClient({ serverUrl, token, fetch = globalThis.fetch, timeo
     },
     whoami: () => request('GET', '/whoami'),
     projects: () => request('GET', '/projects'),
-    lookup: async (url) => (await request('GET', `/lookup?url=${encodeURIComponent(url)}`)).item,
-    capture: (payload) => request('POST', '/capture', { body: payload }),
+    item: (id) => request('GET', `/items/${encodeURIComponent(id)}`),
+    lookup: async (url) => (await request('GET', `/lookup${queryString({ url })}`)).item,
+    related: (url, q, limit = 6) => request('GET', `/related${queryString({ url, q, limit })}`),
+    search: (q, { project, limit = 20 } = {}) => request('GET', `/search${queryString({ q, project, limit })}`),
+    /** Shelves: `{pinned, intent, unopened, reminders, project, limit}`. */
+    items: (filter = {}) => request('GET', `/items${queryString(filter)}`),
+    dueReminders: () => request('GET', '/reminders?due=true'),
+    capture: (payload, { idempotencyKey } = {}) => request('POST', '/capture', { body: payload, idempotencyKey }),
+    captureBatch: (items, { idempotencyKey } = {}) => request('POST', '/capture/batch', { body: { items }, idempotencyKey }),
+    opened: (id) => request('POST', item(id, 'opened')),
+    pin: (id, pinned) => request('POST', item(id, 'pin'), { body: { pinned } }),
+    setIntent: (id, intent) => request('PUT', item(id, 'intent'), { body: { intent } }),
+    setReminder: (id, at) => request('PUT', item(id, 'reminder'), { body: { at } }),
+    accept: (id) => request('POST', item(id, 'accept')),
   };
 }

@@ -47,10 +47,55 @@
     </form>
 
     <section class="panel">
-      <h2>Saving</h2>
-      <p class="help">Click the toolbar button to save the page with a project, tags and a note. Right-click a page, selection or link to save it instantly. Instant saves go to the project you last picked in the popup.</p>
+      <h2>Toolbar button</h2>
+      <div class="radio-group" role="radiogroup" aria-label="The toolbar button opens">
+        <label class="radio"><input type="radio" name="action-opens" value="popup"> <span><strong>Save popup</strong><span class="help">Quick save with a project, tags and a note.</span></span></label>
+        <label class="radio"><input type="radio" name="action-opens" value="panel"> <span><strong>Side panel</strong><span class="help">This page, related items, search and shelves, next to the page you're reading.</span></span></label>
+      </div>
+      <p class="help">Right-click a page, selection or link to save it instantly. Instant saves go to the project you last picked.</p>
       <dl id="shortcuts" class="shortcuts"></dl>
       <p class="help">Change shortcuts in your browser's extension shortcut settings.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Import browser bookmarks</h2>
+      <p class="help">Adds every bookmark in this browser to Enve Memory in one go. Folder names become tags. Pages you've already saved get the new tags and aren't duplicated, so running it again is safe. Whether pages are fetched for full-text search follows Enve Memory's own settings.</p>
+      <div id="import-progress" class="progress" hidden>
+        <div class="progress-track"><div id="import-bar" class="progress-bar"></div></div>
+        <p id="import-count" class="help"></p>
+      </div>
+      <div id="import-result" class="message" role="status" hidden>
+        <p id="import-title" class="result-title"></p>
+        <p id="import-detail"></p>
+      </div>
+      <div class="actions">
+        <button type="button" class="button" id="import">Import bookmarks</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Privacy and notifications</h2>
+      <label class="toggle">
+        <input type="checkbox" id="track-visits">
+        <span><strong>Mark saved links as opened when I visit them</strong>
+          <span class="help">When you switch to a tab, its address is checked against your library with Enve Memory's lookup, and a saved link is marked opened (so it leaves the Unopened shelf). Addresses go only to your own Enve Memory; nothing else is recorded or sent. Needs permission to see your tabs. Off by default.</span></span>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="notify-reminders">
+        <span><strong>Show reminder notifications</strong>
+          <span class="help">Checks for due reminders every few minutes and shows a notification; click it to open the page. The desktop app also notifies, so leave this off if it's running.</span></span>
+      </label>
+    </section>
+
+    <section class="panel" id="outbox-panel" hidden>
+      <h2>Waiting to sync</h2>
+      <p id="outbox-summary" class="help"></p>
+      <ul id="outbox-failed" class="failed-list"></ul>
+      <div class="actions">
+        <button type="button" class="button" id="outbox-discard">Discard failed</button>
+        <button type="button" class="button" id="outbox-retry">Retry failed</button>
+        <button type="button" class="button primary" id="outbox-sync">Sync now</button>
+      </div>
     </section>
   </main>
 </body>

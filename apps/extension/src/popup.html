@@ -5,15 +5,21 @@
   <meta name="color-scheme" content="dark light">
   <title>Enve Memory</title>
   <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="components.css">
   <link rel="stylesheet" href="popup.css">
   <script type="module" src="popup.js"></script>
 </head>
 <body>
   <header class="bar">
     <span class="brand"><img src="icons/icon-32.png" alt="" width="20" height="20">Enve Memory</span>
-    <button type="button" class="icon-button" id="open-settings" title="Settings" aria-label="Settings">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
-    </button>
+    <span class="bar-actions">
+      <button type="button" class="icon-button" id="open-panel" title="Open side panel" aria-label="Open side panel">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M14.5 4.5v15"/></svg>
+      </button>
+      <button type="button" class="icon-button" id="open-settings" title="Settings" aria-label="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      </button>
+    </span>
   </header>
 
   <section id="setup" class="card" hidden>
@@ -24,6 +30,11 @@
   </section>
 
   <form id="capture" hidden>
+    <div id="sync" class="status-strip" role="status" hidden>
+      <span id="sync-text"></span>
+      <button type="button" class="link" id="sync-now">Sync now</button>
+    </div>
+
     <div id="existing" class="notice" hidden>
       <p class="notice-title">Already saved <span id="existing-date"></span></p>
       <p id="existing-meta" class="notice-meta"></p>
@@ -34,6 +45,16 @@
       <input id="title" type="text" autocomplete="off" spellcheck="false">
     </label>
     <p id="url" class="url"></p>
+
+    <div class="field">
+      <span class="label">Save for</span>
+      <div id="intent" class="chip-row"></div>
+    </div>
+
+    <div class="field">
+      <span class="label">Remind me <span id="reminder-set" class="label-hint"></span></span>
+      <div id="remind" class="chip-row"></div>
+    </div>
 
     <label class="field" id="project-field">
       <span class="label">Project</span>
@@ -47,6 +68,8 @@
       </div>
     </div>
 
+    <div id="ai" class="ai" hidden></div>
+
     <div class="field" id="selection-field" hidden>
       <span class="label">Selection <button type="button" class="link" id="clear-selection">Remove</button></span>
       <textarea id="selection" class="quote" rows="3"></textarea>
@@ -57,7 +80,7 @@
       <textarea id="note" rows="3" placeholder="Why it matters, what to do with it"></textarea>
     </label>
 
-    <div id="error" class="message error" role="alert" hidden>
+    <div id="error" class="message alert error" role="alert" hidden>
       <p id="error-text"></p>
       <button type="button" class="link" id="error-settings" hidden>Open Settings</button>
     </div>

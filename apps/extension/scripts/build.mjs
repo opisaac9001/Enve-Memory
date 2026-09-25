@@ -10,12 +10,23 @@ const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
 const { manifest_version, name, ...rest } = JSON.parse(await readFile(join(src, 'manifest.json'), 'utf8'));
 const base = { manifest_version, name, version: pkg.version, ...rest };
 
+const { side_panel, ...firefoxBase } = base;
+const { 'open-panel': openPanel, ...firefoxCommands } = base.commands;
+
 const targets = {
   chrome: base,
   firefox: {
-    ...base,
+    ...firefoxBase,
     // Firefox MV3 has no extension service workers; it runs the same module as a background script.
     background: { scripts: [base.background.service_worker], type: 'module' },
+    permissions: base.permissions.filter((permission) => permission !== 'sidePanel'),
+    sidebar_action: {
+      default_panel: side_panel.default_path,
+      default_title: base.name,
+      default_icon: base.action.default_icon,
+      open_at_install: false,
+    },
+    commands: { ...firefoxCommands, _execute_sidebar_action: { suggested_key: openPanel.suggested_key, description: openPanel.description } },
     browser_specific_settings: {
       gecko: {
         id: 'enve-memory@envemedia.com',
@@ -25,6 +36,12 @@ const targets = {
     },
   },
 };
+
+// Tests can't click the browser's permission prompt, so their build holds the optional permissions from the start.
+if (process.argv.includes('--e2e')) {
+  const { optional_permissions, ...rest } = base;
+  targets['chrome-e2e'] = { ...rest, permissions: [...base.permissions, ...optional_permissions] };
+}
 
 await rm(dist, { recursive: true, force: true });
 for (const [target, manifest] of Object.entries(targets)) {

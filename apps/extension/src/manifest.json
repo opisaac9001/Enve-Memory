@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Enve Memory",
-  "description": "Save pages, links and selections to your local Enve Memory library.",
+  "description": "Save pages, links and selections to your local Enve Memory library, and find them again from a side panel.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -16,6 +16,9 @@
       "32": "icons/icon-32.png"
     }
   },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -24,16 +27,44 @@
     "page": "options.html",
     "open_in_tab": true
   },
-  "permissions": ["activeTab", "contextMenus", "storage", "scripting", "notifications"],
-  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "permissions": [
+    "activeTab",
+    "alarms",
+    "contextMenus",
+    "notifications",
+    "scripting",
+    "sidePanel",
+    "storage"
+  ],
+  "optional_permissions": [
+    "bookmarks",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "commands": {
     "_execute_action": {
-      "suggested_key": { "default": "Alt+Shift+E" },
+      "suggested_key": {
+        "default": "Alt+Shift+E"
+      },
       "description": "Open the save popup"
     },
+    "open-panel": {
+      "suggested_key": {
+        "default": "Alt+Shift+M"
+      },
+      "description": "Open the Enve Memory side panel"
+    },
     "quick-save": {
-      "suggested_key": { "default": "Alt+Shift+S" },
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
       "description": "Save the current page instantly"
     }
   }
