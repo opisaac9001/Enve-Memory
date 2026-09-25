@@ -150,8 +150,8 @@ test('ask tells the model which decisions were replaced', async () => {
   const provider = new FakeProvider(() => 'The ESP32-S3 [1].');
   await ask(memory, provider, 'which controller did we decide on');
   const prompt = provider.requests[0]!.prompt;
-  assert.match(prompt, /status="superseded" title="Use an ESP32 controller"/);
-  assert.match(prompt, /status="current" title="Switch to the ESP32-S3 controller"/);
+  assert.doesNotMatch(prompt, /title="Use an ESP32 controller"/);
+  assert.match(prompt, /status="current" title="Switch to the ESP32-S3 controller"[\s\S]*replaces an earlier decision: "Use an ESP32 controller"/);
   assert.match(provider.requests[0]!.system, /superseded/);
 });
 
@@ -163,6 +163,6 @@ test('a superseded decision in the sources brings its replacement along', async 
   const latest = memory.decisions.record({ project: 'garage', decision: 'Settle on the C6 board', reason: 'Thread radio', supersedes: [middle.id] });
   const provider = new FakeProvider(() => 'The C6 board [3].');
   const result = await ask(memory, provider, 'ESP32 controller');
-  assert.deepEqual(new Set(result.sources.map((s) => s.id)), new Set([old.id, middle.id, latest.id]));
-  assert.match(provider.requests[0]!.prompt, /status="current" title="Settle on the C6 board"/);
+  assert.deepEqual(result.sources.map((s) => s.id), [latest.id], 'only the current decision is a source');
+  assert.match(provider.requests[0]!.prompt, /status="current" title="Settle on the C6 board">[\s\S]*replaces an earlier decision: "Switch to the S3 module"/);
 });

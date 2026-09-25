@@ -64,9 +64,16 @@ export async function ask(memory: EnveMemory, provider: AiProvider, question: st
       }
     }
   }
-  const sources = items.map((item, i) => ({
-    n: i + 1, item, text: relevantPassages([item.body, item.content].filter(Boolean).join('\n\n'), question),
-  }));
+  // A replaced decision never stands as its own source (small models tend to answer with it); its current decision
+  // carries it as history instead.
+  const replaced = new Set(items.filter((i) => i.type === 'decision' && i.relations.some((r) => r.kind === 'supersedes' && r.direction === 'incoming' && seen.has(r.id))).map((i) => i.id));
+  const kept = items.filter((i) => !replaced.has(i.id));
+  const sources = kept.map((item, i) => {
+    const history = item.type === 'decision'
+      ? item.relations.filter((r) => r.kind === 'supersedes' && r.direction === 'outgoing').map((r) => `(This replaces an earlier decision: "${r.title}".)`)
+      : [];
+    return { n: i + 1, item, text: relevantPassages([item.body, item.content, ...history].filter(Boolean).join('\n\n'), question) };
+  });
   const prompt = [
     ...sources.map(({ n, item, text }) => {
       const replaced = item.type === 'decision' && item.relations.some((r) => r.kind === 'supersedes' && r.direction === 'incoming');
