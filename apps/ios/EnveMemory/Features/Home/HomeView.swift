@@ -1,0 +1,156 @@
+import EnveMemoryKit
+import SwiftUI
+
+struct HomeView: View {
+    @Environment(Connection.self) private var connection
+    @Environment(OutboxService.self) private var outbox
+    @Environment(Router.self) private var router
+    @Environment(\.hearth) private var hearth
+
+    @State private var items: [Item] = []
+    @State private var loadError: String?
+    @State private var loaded = false
+
+    var body: some View {
+        HearthScreen(title: "Home", overline: statusLine) {
+            QuickCaptureBar()
+            if outbox.pendingCount > 0 { OutboxBanner() }
+            if let loadError { ErrorBanner(message: loadError) { Task { await load() } } }
+            recent
+        }
+        .refreshable { await load() }
+        .task(id: connection.revision) { await load() }
+    }
+
+    private var statusLine: String {
+        switch connection.status {
+        case .online(let server, _): "Connected · \(connection.pairing?.baseURL.host() ?? "") · v\(server.version)"
+        case .offline: "Offline"
+        case .unauthorized: "Pairing revoked"
+        case .unknown, .checking: "Connecting…"
+        }
+    }
+
+    @ViewBuilder
+    private var recent: some View {
+        Overline("Recent")
+        if items.isEmpty {
+            if loaded, loadError == nil {
+                EmptyStateView(symbol: "tray", title: "Nothing saved yet",
+                               message: "Capture a note above, or share a link from Safari to Enve Memory.")
+            }
+        } else {
+            RowStack(data: items) { item in
+                Button { router.open(.item(item.id)) } label: { ItemRow(item: item) }
+                    .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func load() async {
+        guard let client = connection.client else { return }
+        do {
+            items = try await client.items(ItemFilter(limit: 30))
+            loadError = nil
+            if !connection.isOnline { await connection.refresh() }
+        } catch is CancellationError {
+            return
+        } catch {
+            loadError = error.localizedDescription
+            connection.note(error)
+        }
+        loaded = true
+    }
+}
+
+/// Type and send. A bare URL is saved as a link, anything else as a note.
+private struct QuickCaptureBar: View {
+    @Environment(OutboxService.self) private var outbox
+    @Environment(Router.self) private var router
+    @Environment(\.hearth) private var hearth
+
+    @State private var text = ""
+    @State private var sending = false
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HearthCard(padding: HearthSpacing.md) {
+            VStack(alignment: .leading, spacing: HearthSpacing.md) {
+                HStack(alignment: .bottom, spacing: HearthSpacing.sm) {
+                    TextField("Jot something, or paste a link", text: $text, axis: .vertical)
+                        .lineLimit(1...6)
+                        .focused($focused)
+                        .font(HearthFont.body)
+                        .padding(.vertical, HearthSpacing.sm)
+                        .accessibilityIdentifier("QuickCaptureField")
+                    Button(action: send) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 30))
+                            .foregroundStyle(canSend ? hearth.accent : hearth.textTertiary)
+                    }
+                    .disabled(!canSend)
+                    .accessibilityLabel("Save")
+                    .accessibilityIdentifier("QuickCaptureSend")
+                }
+                HStack(spacing: HearthSpacing.sm) {
+                    ForEach(CaptureKind.allCases) { kind in
+                        FilterChip(title: kind.title, systemImage: kind.symbol, isSelected: false) {
+                            router.capture = kind
+                        }
+                        .accessibilityLabel("New \(kind.title.lowercased())")
+                    }
+                }
+            }
+        }
+    }
+
+    private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canSend: Bool { !trimmed.isEmpty && !sending }
+
+    private func send() {
+        let value = trimmed
+        sending = true
+        Task {
+            defer { sending = false }
+            let isLink = URL.web(value) != nil
+            let request = isLink ? CaptureRequest(url: value) : CaptureRequest(note: value)
+            guard let endpoint = try? Endpoint.capture(request) else { return }
+            let outcome = await outbox.submit(endpoint, kind: isLink ? .link : .note, title: String(value.prefix(60)))
+            if router.report(outcome, sent: isLink ? "Link saved" : "Note saved") {
+                text = ""
+                focused = false
+            }
+        }
+    }
+}
+
+private struct OutboxBanner: View {
+    @Environment(OutboxService.self) private var outbox
+    @Environment(Router.self) private var router
+    @Environment(\.hearth) private var hearth
+
+    var body: some View {
+        HearthCard(padding: HearthSpacing.md) {
+            HStack(spacing: HearthSpacing.md) {
+                TypeGlyph(symbol: "tray.and.arrow.up")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(outbox.pendingCount == 1 ? "1 capture waiting to sync" : "\(outbox.pendingCount) captures waiting to sync")
+                        .font(HearthFont.subheadline)
+                    Text("They'll send when your server is reachable.")
+                        .font(HearthFont.caption)
+                        .foregroundStyle(hearth.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if outbox.isFlushing {
+                    ProgressView()
+                } else {
+                    Button("Sync") { Task { await outbox.flush(ignoringBackoff: true) } }
+                        .font(HearthFont.subheadline)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { router.selectedTab = .settings }
+        }
+        .accessibilityIdentifier("OutboxBanner")
+    }
+}

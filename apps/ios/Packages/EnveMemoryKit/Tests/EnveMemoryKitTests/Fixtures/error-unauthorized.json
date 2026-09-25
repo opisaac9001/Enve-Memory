@@ -1,0 +1,1 @@
+{"error":{"code":"unauthorized","message":"A valid bearer token is required. Create one with `enve-memory clients add`."}}

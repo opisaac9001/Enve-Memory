@@ -1,0 +1,72 @@
+[
+  {
+    "id": "01a0d70c-31db-7d18-bb4d-592cfba2e08e",
+    "type": "decision",
+    "title": "Power the ESP32 from the opener's 12 V terminal through a buck converter",
+    "url": null,
+    "project": {
+      "id": "01a0d70c-2c99-7f67-9691-82c7ad19ebc8",
+      "name": "Garage"
+    },
+    "snippet": "Power the ESP32 from the [opener]'s 12 V terminal through a buck converter",
+    "match": "both",
+    "taskStatus": null,
+    "updatedAt": "2026-09-25T05:31:35.771Z"
+  },
+  {
+    "id": "01a0d70c-7923-7316-87fc-340f6c8b12a0",
+    "type": "note",
+    "title": "Spring tension",
+    "url": null,
+    "project": {
+      "id": "01a0d70c-2c99-7f67-9691-82c7ad19ebc8",
+      "name": "Garage"
+    },
+    "snippet": "Check the garage [door] spring tension before winter",
+    "match": "both",
+    "taskStatus": null,
+    "updatedAt": "2026-09-25T05:31:54.019Z"
+  },
+  {
+    "id": "01a0d70c-3b2c-72bd-8300-f3bed2b1ac04",
+    "type": "file",
+    "title": "Security+ 2.0 wire protocol notes",
+    "url": null,
+    "project": {
+      "id": "01a0d70c-2c99-7f67-9691-82c7ad19ebc8",
+      "name": "Garage"
+    },
+    "snippet": "…packet is ignored.\n\n## Commands\n\n| Command | Value |\n|---|---|\n| [Door] toggle | 0x01 |\n| Light | 0x02 |\n| Lock | 0x03 |\n\n## Timing\n\nAfter the [opener] transmits, the wall panel must wait at…",
+    "match": "both",
+    "taskStatus": null,
+    "updatedAt": "2026-09-25T05:31:38.156Z"
+  },
+  {
+    "id": "01a0d70c-32f3-70a4-bf27-8b6dc6d957f7",
+    "type": "note",
+    "title": "Bench-test rig",
+    "url": null,
+    "project": {
+      "id": "01a0d70c-2c99-7f67-9691-82c7ad19ebc8",
+      "name": "Garage"
+    },
+    "snippet": "…an ESP32 on the wire, a second one pretending to be the [opener], and a logic analyzer in the middle.",
+    "match": "both",
+    "taskStatus": null,
+    "updatedAt": "2026-09-25T05:31:36.051Z"
+  },
+  {
+    "id": "01a0d70c-2fad-705a-97cb-dc776e6ba4a6",
+    "type": "decision",
+    "title": "Use ESPHome for the firmware",
+    "url": null,
+    "project": {
+      "id": "01a0d70c-2c99-7f67-9691-82c7ad19ebc8",
+      "name": "Garage"
+    },
+    "snippet": "Use ESPHome for the firmware Fastest path to Home Assistant",
+    "match": "semantic",
+    "taskStatus": null,
+    "updatedAt": "2026-09-25T05:31:35.213Z"
+  }
+]

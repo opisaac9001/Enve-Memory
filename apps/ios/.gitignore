@@ -1,0 +1,8 @@
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+build/
+DerivedData/
+Packages/EnveMemoryKit/.build/
+Packages/EnveMemoryKit/.swiftpm/
+.DS_Store

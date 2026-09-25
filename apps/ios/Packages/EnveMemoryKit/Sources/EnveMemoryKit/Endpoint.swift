@@ -1,0 +1,161 @@
+import Foundation
+
+/// One API call, relative to `<base>/api/v1`. Codable so the outbox can persist it verbatim.
+public struct Endpoint: Codable, Hashable, Sendable {
+    public struct QueryItem: Codable, Hashable, Sendable {
+        public let name: String
+        public let value: String
+    }
+
+    public var method: String
+    public var path: String
+    public var query: [QueryItem]
+    public var headers: [String: String]
+    public var body: Data?
+
+    public init(method: String = "GET", path: String, query: [QueryItem] = [], headers: [String: String] = [:], body: Data? = nil) {
+        self.method = method
+        self.path = path
+        self.query = query
+        self.headers = headers
+        self.body = body
+    }
+
+    static func get(_ path: String, _ query: [(String, String?)] = []) -> Endpoint {
+        Endpoint(path: path, query: query.compactMap { name, value in
+            guard let value, !value.isEmpty else { return nil }
+            return QueryItem(name: name, value: value)
+        })
+    }
+
+    static func json(_ method: String, _ path: String, _ body: some Encodable) throws -> Endpoint {
+        Endpoint(method: method, path: path, headers: ["Content-Type": "application/json"], body: try JSONCoding.makeEncoder().encode(body))
+    }
+
+    static func post(_ path: String) -> Endpoint {
+        Endpoint(method: "POST", path: path)
+    }
+}
+
+public struct CaptureRequest: Codable, Hashable, Sendable {
+    public var url: String?
+    public var title: String?
+    public var selection: String?
+    public var note: String?
+    public var project: String?
+    public var tags: [String]?
+
+    public init(url: String? = nil, title: String? = nil, selection: String? = nil, note: String? = nil, project: String? = nil, tags: [String]? = nil) {
+        self.url = url
+        self.title = title
+        self.selection = selection
+        self.note = note
+        self.project = project
+        self.tags = tags
+    }
+}
+
+public struct NewItemRequest: Codable, Hashable, Sendable {
+    public var type: ItemType
+    public var title: String?
+    public var body: String?
+    public var url: String?
+    public var project: String?
+    public var tags: [String]?
+    public var due: String?
+    public var priority: TaskPriority?
+
+    public init(type: ItemType, title: String? = nil, body: String? = nil, url: String? = nil, project: String? = nil,
+                tags: [String]? = nil, due: String? = nil, priority: TaskPriority? = nil) {
+        self.type = type
+        self.title = title
+        self.body = body
+        self.url = url
+        self.project = project
+        self.tags = tags
+        self.due = due
+        self.priority = priority
+    }
+}
+
+/// Metadata for `POST /files`; the bytes stream from a file on disk.
+public struct FileUpload: Codable, Hashable, Sendable {
+    public var filename: String
+    public var mimeType: String
+    public var title: String?
+    public var note: String?
+    public var project: String?
+    public var tags: [String]
+
+    public init(filename: String, mimeType: String, title: String? = nil, note: String? = nil, project: String? = nil, tags: [String] = []) {
+        self.filename = filename
+        self.mimeType = mimeType
+        self.title = title
+        self.note = note
+        self.project = project
+        self.tags = tags
+    }
+}
+
+public struct ItemFilter: Hashable, Sendable {
+    public var project: String?
+    public var type: ItemType?
+    public var tag: String?
+    public var limit: Int?
+
+    public init(project: String? = nil, type: ItemType? = nil, tag: String? = nil, limit: Int? = nil) {
+        self.project = project
+        self.type = type
+        self.tag = tag
+        self.limit = limit
+    }
+
+    var query: [(String, String?)] {
+        [("project", project), ("type", type?.rawValue), ("tag", tag), ("limit", limit.map(String.init))]
+    }
+}
+
+public enum TaskListStatus: String, Sendable, CaseIterable {
+    case active, open, inProgress = "in_progress", done, all
+}
+
+extension Endpoint {
+    public static let status = get("/status")
+    public static let whoami = get("/whoami")
+
+    public static func search(_ text: String, filter: ItemFilter = .init()) -> Endpoint {
+        get("/search", [("q", text)] + filter.query)
+    }
+
+    public static func items(_ filter: ItemFilter = .init()) -> Endpoint { get("/items", filter.query) }
+    public static func item(_ id: String) -> Endpoint { get("/items/\(segment(id))") }
+    public static func itemFile(_ id: String) -> Endpoint { get("/items/\(segment(id))/file") }
+    public static let projects = get("/projects")
+    public static func briefing(_ ref: String) -> Endpoint { get("/projects/\(segment(ref))") }
+
+    public static func tasks(project: String? = nil, status: TaskListStatus = .active) -> Endpoint {
+        get("/tasks", [("project", project), ("status", status.rawValue)])
+    }
+
+    public static func capture(_ request: CaptureRequest) throws -> Endpoint { try json("POST", "/capture", request) }
+    public static func createItem(_ request: NewItemRequest) throws -> Endpoint { try json("POST", "/items", request) }
+    public static func completeTask(_ id: String) -> Endpoint { post("/tasks/\(segment(id))/complete") }
+
+    public static func upload(_ file: FileUpload) -> Endpoint {
+        var headers = ["Content-Type": file.mimeType, "X-Filename": percentEncoded(file.filename)]
+        if let title = file.title, !title.isEmpty { headers["X-Title"] = percentEncoded(title) }
+        if let note = file.note, !note.isEmpty { headers["X-Note"] = percentEncoded(note) }
+        if let project = file.project, !project.isEmpty { headers["X-Project"] = percentEncoded(project) }
+        if !file.tags.isEmpty { headers["X-Tags"] = percentEncoded(file.tags.joined(separator: ",")) }
+        return Endpoint(method: "POST", path: "/files", headers: headers)
+    }
+
+    static let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+
+    /// Strict RFC 3986 encoding; the server decodes with `decodeURIComponent`, and `+` must not become a space.
+    static func percentEncoded(_ value: String) -> String {
+        value.addingPercentEncoding(withAllowedCharacters: unreserved) ?? value
+    }
+
+    static func segment(_ value: String) -> String { percentEncoded(value) }
+}
