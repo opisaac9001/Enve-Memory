@@ -17,7 +17,8 @@
     "cli": "node packages/cli/src/main.ts",
     "test:extension": "npm --prefix apps/extension test",
     "models": "node -e \"import('@enve-memory/embeddings').then(async ({ LocalEmbedder }) => { await new LocalEmbedder('.cache/models').embed(['warm up'], 'query'); console.log('Model cached in .cache/models'); })\"",
-    "test:desktop": "tsc -p apps/desktop && npm --prefix apps/desktop test"
+    "test:desktop": "tsc -p apps/desktop && npm --prefix apps/desktop test",
+    "demo": "node scripts/demo-library.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
