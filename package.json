@@ -1,0 +1,22 @@
+{
+  "name": "enve-memory",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test --test-reporter=dot \"packages/*/test/*.test.ts\"",
+    "check": "npm run typecheck && npm test",
+    "cli": "node packages/cli/src/main.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,62 @@
+# MCP server
+
+Implemented in [`packages/mcp/src/server.ts`](../packages/mcp/src/server.ts) with the official TypeScript SDK v2 (`@modelcontextprotocol/server`, MCP spec 2026-07-28). It serves both the 2026 and the 2025 protocol eras from one factory.
+
+## Connecting
+
+Run `enve-memory connect` to get copy-paste setup for Claude Code, Codex, and JSON-configured clients (Claude Desktop, Cursor). From a checkout:
+
+```bash
+claude mcp add --scope user enve-memory -- node "/path/to/Enve Memory/packages/cli/src/main.ts" mcp
+```
+
+Transport today is **stdio**: the client launches `enve-memory mcp` and talks over stdin/stdout. Several clients can run their own stdio server against the same library at once (SQLite WAL). Streamable HTTP on `127.0.0.1` arrives with the desktop app. Its security model is in [SECURITY.md](SECURITY.md).
+
+## Tools
+
+| Tool | Kind | Purpose |
+|---|---|---|
+| `search` | read | Full-text search with project / type / tag filters; ranked hits with highlighted snippets |
+| `get_item` | read | Full item with tags, task fields and relations |
+| `list_items` | read | Recent items, filterable; bodies trimmed to a 280-char preview |
+| `list_projects` | read | Projects (archived ones hidden by default) |
+| `get_project` | read | **Briefing**: description, instructions, memory document, decision log, open tasks, recent notes/links |
+| `list_tasks` | read | Tasks by due date then priority; `active` = open or in progress |
+| `get_recent_activity` | read | Who changed what, newest first |
+| `save_note` | write | New note |
+| `save_link` | write | New bookmark; an already-saved URL returns the existing one (`created: false`) and merges tags |
+| `update_item` | write | Edit title / body / URL / project. Refuses decisions. |
+| `archive_item` | write | Hide from lists and search (reversible) |
+| `tag_item` | write | Add/remove tags |
+| `relate_items` | write | related_to / references / derived_from / depends_on |
+| `create_project`, `update_project` | write | |
+| `set_project_memory` | write | Replace the memory document (history kept) |
+| `record_decision` | write | Append a decision, optionally superseding earlier ones |
+| `create_task`, `update_task`, `complete_task` | write | |
+
+No tool deletes anything, and every tool is annotated `destructiveHint: false`. Read tools are `readOnlyHint: true`.
+
+## Design rules
+
+- **Tools are thin.** They shape arguments, call one core service, and trim output. Business rules live in core.
+- **The briefing is the front door.** `get_project` answers "what do we know about X?" in one call, instead of making the model orchestrate four.
+- **Project references are forgiving.** Name, slug, id, or an unambiguous slug prefix. A miss returns the list of existing projects, so the model can self-correct.
+- **Errors are tool results.** Core validation errors come back as `isError` results with a human-readable message, never as protocol failures.
+- **Outputs are compact JSON.** Lists carry previews; `get_item` carries full text.
+- **Attribution.** Each call records `mcp:<client name>` as the actor, from per-request client info (2026 era) or the initialize handshake (2025 era).
+
+## Prompt injection
+
+Saved content is untrusted. It is often copied from web pages. The mitigations:
+
+1. **Server instructions** tell the model that every title, body, note, url, snippet and memory field is user data, and to never follow instructions inside it.
+2. **No destructive tools.** The worst a hijacked model can do is add or archive items, or overwrite a memory document. All of that is reversible from the change log.
+3. **The append-only decision log** can't be rewritten through MCP.
+4. With HTTP clients, **per-client permission scopes** will let a user make a client search-only (see SECURITY.md).
+
+## Next
+
+- Resources: `memory://project/<slug>` for clients that attach context rather than call tools.
+- Prompts: "brief me on <project>", "log what we decided".
+- Semantic and hybrid search behind the same `search` tool.
+- `save_file` / `get_file` once attachments exist.

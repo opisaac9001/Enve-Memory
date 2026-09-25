@@ -1,0 +1,17 @@
+{
+  "name": "@enve-memory/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "bin": {
+    "enve-memory": "./src/main.ts"
+  },
+  "dependencies": {
+    "@enve-memory/core": "0.1.0",
+    "@enve-memory/mcp": "0.1.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.1.0"
+  }
+}
