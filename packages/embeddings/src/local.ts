@@ -1,5 +1,5 @@
 import type { Embedder } from '@enve-memory/core';
-import { type FeatureExtractionPipeline, env, pipeline } from '@huggingface/transformers';
+import type { FeatureExtractionPipeline } from '@huggingface/transformers';
 
 export interface LocalModel {
   /** Hugging Face repo with ONNX weights. */
@@ -24,6 +24,11 @@ export const DEFAULT_LOCAL_MODEL: LocalModel = {
  * Runs a small embedding model on this machine (ONNX, int8). The weights (~23 MB) download once into
  * `cacheDir` and every later run is offline.
  */
+/** onnxruntime-node ships no build for Intel Macs; everywhere else Node runs, it does. */
+export function localEmbeddingsSupported(platform: NodeJS.Platform = process.platform, arch: string = process.arch): boolean {
+  return !(platform === 'darwin' && arch === 'x64');
+}
+
 export class LocalEmbedder implements Embedder {
   readonly model: string;
   readonly minScore: number;
@@ -50,8 +55,11 @@ export class LocalEmbedder implements Embedder {
 
   private load(): Promise<FeatureExtractionPipeline> {
     if (!this.extractor) {
-      env.cacheDir = this.cacheDir;
-      this.extractor = pipeline('feature-extraction', this.spec.repo, { dtype: 'q8' }).catch((error: unknown) => {
+      // Imported on first use: the ONNX runtime is a large native module, and some platforms have no build of it.
+      this.extractor = import('@huggingface/transformers').then(async ({ env, pipeline }) => {
+        env.cacheDir = this.cacheDir;
+        return (await pipeline('feature-extraction', this.spec.repo, { dtype: 'q8' })) as FeatureExtractionPipeline;
+      }).catch((error: unknown) => {
         this.extractor = null;
         throw error;
       }) as Promise<FeatureExtractionPipeline>;

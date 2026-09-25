@@ -1,12 +1,12 @@
 import { DrainWorker, type EnveMemory } from '@enve-memory/core';
-import { LocalEmbedder } from './local.ts';
+import { LocalEmbedder, localEmbeddingsSupported } from './local.ts';
 
 /**
  * Gives a library the local embedding model when semantic search is on. Cheap: the model loads on first use,
  * and hybrid search only calls it once something has been indexed.
  */
 export function attachLocalEmbedder(memory: EnveMemory): LocalEmbedder | null {
-  if (!memory.paths || !memory.settings.get('semanticSearch')) {
+  if (!memory.paths || !memory.settings.get('semanticSearch') || !localEmbeddingsSupported()) {
     memory.search.embedder = null;
     return null;
   }

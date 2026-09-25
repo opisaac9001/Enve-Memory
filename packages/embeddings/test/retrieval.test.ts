@@ -56,3 +56,11 @@ test('hybrid search answers paraphrased questions the keyword index cannot', { s
   const unrelated = await memory.search.hybrid('quantum chromodynamics lattice gauge theory');
   assert.deepEqual(unrelated, [], 'nothing relevant means no results, not the least-bad ones');
 });
+
+test('semantic search is off on platforms without an ONNX runtime build', async () => {
+  const { localEmbeddingsSupported } = await import('@enve-memory/embeddings');
+  assert.equal(localEmbeddingsSupported('darwin', 'x64'), false);
+  assert.equal(localEmbeddingsSupported('darwin', 'arm64'), true);
+  assert.equal(localEmbeddingsSupported('win32', 'x64'), true);
+  assert.equal(localEmbeddingsSupported('linux', 'arm64'), true);
+});
