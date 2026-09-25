@@ -161,6 +161,25 @@ export interface Change {
   data: Record<string, unknown> | null;
 }
 
+export interface GraphNode {
+  id: string;
+  kind: 'item' | 'project' | 'tag';
+  label: string;
+  /** Item type, for item nodes. */
+  type?: ItemType;
+}
+
+export interface GraphEdge {
+  from: string;
+  to: string;
+  kind: RelationKind | 'in_project' | 'tagged';
+}
+
+export interface Graph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
 export interface ProjectBriefing {
   project: Project;
   decisions: Decision[];

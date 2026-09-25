@@ -24,6 +24,7 @@
 | `packages/mcp` | MCP tool definitions over core, using the official TypeScript SDK v2 (`@modelcontextprotocol/server`, spec 2026-07-28). Thin: argument shaping and output trimming only. |
 | `packages/ingestion` | Fetch (no cookies, time/size caps), readable-article extraction (Readability + linkedom → Markdown via Turndown), PDF text (unpdf), and `IngestWorker` for background draining. |
 | `packages/embeddings` | `LocalEmbedder` (transformers.js), `attachLocalEmbedder`, and the background `indexWorker`. |
+| `packages/importers` | Browser bookmark exports (a token scan of the Netscape format), Markdown folders and Obsidian vaults (front matter, inline tags, re-runs skip what's imported), bookmark CSVs, and Enve exports (ids, dates, files, decisions and relations restored). |
 | `packages/api` | Local HTTP server: REST (`/api/v1`) + MCP over Streamable HTTP (`/mcp`), with token auth, scopes and Host/Origin guards. |
 | `packages/cli` | The `enve-memory` binary: human and `--json` commands, `mcp` (stdio), `serve` (HTTP), `clients` (tokens) and `connect` (client setup snippets). |
 
@@ -52,6 +53,10 @@ Distribution will need a compile-to-JS step: Node refuses to strip types from fi
 - Linux: `$XDG_CONFIG_HOME/Enve Memory/` (default `~/.config/…`)
 
 The folder contains `memory.sqlite` (with `-wal`/`-shm` files), `attachments/` (content-addressed file blobs, plus `.trash/` for 30 days after deletion) and `backups/`. The embedding model lives in the OS cache folder (`~/Library/Caches/Enve Memory/models`, `%LOCALAPPDATA%\Enve Memory\Cache`, `~/.cache/enve-memory`; override with `$ENVE_MEMORY_CACHE`). It's shared by every library, never backed up, and re-downloads if cleared.
+
+## Automations
+
+`RuleService` (core) runs every enabled rule when an item is created and again when its source is archived, so the title, domain and text are known. Conditions (all must hold): item types, link domains (subdomains included), keywords in the title, note or archived text, and the saving client (`mcp:`, `api:Chrome`, …). Actions: add tags, and file into a project if the item has none. Because core applies rules, every client benefits: MCP, the API, the CLI and the desktop app. Actions are attributed to `rule:<name>`. Rules are device-local configuration; they aren't synced.
 
 ## Backups and export
 

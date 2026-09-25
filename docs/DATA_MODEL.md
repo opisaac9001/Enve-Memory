@@ -20,6 +20,8 @@ One `items` table holds notes, bookmarks, tasks, decisions, files and images. Fu
 | `relations` | `from_id`, `to_id`, `kind` (related_to / references / derived_from / depends_on / supersedes), unique per triple |
 | `changes` | Append-only activity and change log. See below. |
 | `settings` | Key/value. `device_id` is generated on first open. `pref.*` holds per-library preferences (`fetchLinks`). |
+| `rules` | Automations: name, `conditions` and `actions` JSON, enabled. Configuration, so not in the change log. |
+| `sync_versions`, `sync_cursors` | Per-entity newest/last-exchanged clock stamps, and the last segment applied from each other device (see SYNC.md). |
 | `api_clients` | HTTP clients: name, SHA-256 of the token, scopes, last used, revoked. Not user content, so it's never logged or synced. |
 | `items_fts` | FTS5 external-content index over `title`, `body`, `url` and `content`, kept in sync by triggers. bm25 weights 10 / 1.5 / 2 / 1. |
 

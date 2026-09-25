@@ -221,4 +221,18 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT;
     `,
   },
+  {
+    name: 'rules',
+    sql: `
+      -- Automations: when an item matching 'conditions' is saved, apply 'actions'. Configuration, so not in the change log.
+      CREATE TABLE rules (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        conditions TEXT NOT NULL CHECK (json_valid(conditions)),
+        actions TEXT NOT NULL CHECK (json_valid(actions)),
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL
+      ) STRICT;
+    `,
+  },
 ];

@@ -14,6 +14,9 @@ export interface CreateTaskInput {
   due?: string;
   priority?: string;
   tags?: string[];
+  /** For importers restoring an export. */
+  id?: string;
+  createdAt?: string;
 }
 
 export interface UpdateTaskInput {
@@ -46,7 +49,9 @@ export class TaskService {
     const priority = PRIORITY_TO_INT[oneOf(input.priority ?? 'normal', TASK_PRIORITIES, 'priority')];
     const due = input.due === undefined ? null : normalizeDue(input.due);
     const id = this.ctx.tx(() => {
-      const id = this.items.insert({ type: 'task', title, body: input.notes, project: input.project, tags: input.tags });
+      const id = this.items.insert({
+        type: 'task', title, body: input.notes, project: input.project, tags: input.tags, id: input.id, createdAt: input.createdAt,
+      });
       this.ctx.run(`INSERT INTO tasks (item_id, priority, due_at) VALUES (?, ?, ?)`, id, priority, due);
       return id;
     });

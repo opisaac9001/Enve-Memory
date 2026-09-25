@@ -16,7 +16,8 @@
 | 5b | Installers for macOS/Windows/Linux | |
 | 6 | iOS companion: SwiftUI app + share extension, capture and search first | |
 | 7 | Folder sync between computers: per-device append-only segments, hybrid logical clocks, full-state LWW records, conflict notes for concurrent text edits, tombstones, content-addressed blobs (see SYNC.md) | ✅ 2026-09-24 |
-| 8 | Ecosystem: plugins (importers, exporters, extractors, providers, tools), automations, graph view, public sharing through a tunnel/relay, remote access via Tailscale | |
+| 8a | Importers (bookmarks HTML, Markdown/Obsidian, CSV, Enve export), automation rules, graph data API | ✅ 2026-09-24 |
+| 8b | Third-party plugins (sandboxed), public sharing through a tunnel/relay | Later: both need a security design first |
 
 Rules of thumb:
 

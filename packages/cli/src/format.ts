@@ -1,5 +1,5 @@
 import type { Answer } from '@enve-memory/ai';
-import type { ApiClient, Change, Decision, Item, ItemDetail, Project, ProjectBriefing, SearchHit, Task } from '@enve-memory/core';
+import type { ApiClient, Change, Rule, Decision, Item, ItemDetail, Project, ProjectBriefing, SearchHit, Task } from '@enve-memory/core';
 
 const oneLine = (text: string, max = 80) => {
   const flat = text.replace(/\s+/g, ' ').trim();
@@ -114,4 +114,15 @@ export function suggestions(item: ItemDetail): string {
 export function answer({ answer: text, sources }: Answer): string {
   if (sources.length === 0) return text;
   return `${text}\n\n${sources.map((s) => `[${s.n}] ${s.title || s.url || s.type}  ${s.id}`).join('\n')}`;
+}
+
+export function ruleLine(rule: Rule): string {
+  const when = [
+    rule.conditions.types && `type ${rule.conditions.types.join('/')}`,
+    rule.conditions.domains && `from ${rule.conditions.domains.join(', ')}`,
+    rule.conditions.keywords && `mentions ${rule.conditions.keywords.map((k) => `"${k}"`).join(' or ')}`,
+    rule.conditions.source && `saved by ${rule.conditions.source}*`,
+  ].filter(Boolean).join(' and ');
+  const then = [rule.actions.tags && rule.actions.tags.map((t) => `#${t}`).join(' '), rule.actions.project && 'file into project'].filter(Boolean).join(', ');
+  return `${rule.enabled ? '' : '[off] '}${rule.name}: when ${when} → ${then}\n    ${rule.id}`;
 }

@@ -4,7 +4,7 @@
 
 Save links, notes, tasks and decisions once. Find them yourself, or let Claude, Codex, Cursor or any other MCP client find and use them. Every assistant reads and writes the same library, and that library is a single SQLite file on your computer. No account, no subscription, no cloud.
 
-> Status: early. The core, CLI, MCP server, local HTTP API, link archiving, semantic search and the browser extension work. The desktop app is next. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: early but broad. Working today: the core library, CLI, MCP server, local HTTP API, link and PDF archiving, local semantic search, the browser extension, optional AI (bring your own provider), backups and export, encrypted folder sync between computers, importers, and automation rules. The desktop app and the iOS companion are in progress. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Try it
 

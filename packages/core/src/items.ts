@@ -28,6 +28,9 @@ export interface NewItem {
   metadata?: ItemMetadata;
   project?: string;
   tags?: string[];
+  /** Importers restoring an Enve export keep the original id and creation time. */
+  id?: string;
+  createdAt?: string;
 }
 
 export interface SourceUpdate {
@@ -75,6 +78,8 @@ export class ItemService {
   private readonly projects: ProjectService;
 
   private readonly settings: SettingsService;
+  /** Set by EnveMemory to run automations after an item is created or its source is archived. */
+  afterSave: ((id: string) => void) | null = null;
 
   constructor(ctx: Context, projects: ProjectService, settings: SettingsService) {
     this.ctx = ctx;
@@ -127,8 +132,10 @@ export class ItemService {
   insert(input: NewItem): string {
     const projectId = input.project ? this.projects.resolve(input.project).id : null;
     const tags = (input.tags ?? []).map(normalizeTag);
-    const id = newId();
+    const id = input.id ?? newId();
+    if (input.id && this.ctx.get(`SELECT 1 FROM items WHERE id = ?`, input.id)) throw new MemoryError('conflict', `An item with id "${input.id}" already exists.`);
     const now = this.ctx.now();
+    const created = input.createdAt ?? now;
     const title = input.title?.trim() ?? '';
     const body = input.body?.trim() ?? '';
     const url = input.url ?? null;
@@ -138,11 +145,12 @@ export class ItemService {
       this.ctx.run(
         `INSERT INTO items (id, type, title, body, url, content, metadata, project_id, source, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        id, input.type, title, body, url, content, JSON.stringify(metadata), projectId, this.ctx.actor, now, now,
+        id, input.type, title, body, url, content, JSON.stringify(metadata), projectId, this.ctx.actor, created, created,
       );
       this.ctx.record('item', id, 'create', projectId, { type: input.type, title, body, url, content, metadata, projectId });
       if (tags.length) this.applyTags(id, projectId, tags, []);
     });
+    this.afterSave?.(id);
     return id;
   }
 
@@ -179,6 +187,7 @@ export class ItemService {
     if (update.content !== undefined) changes.content = update.content;
     if (update.title?.trim() && !row.title) changes.title = update.title.trim();
     this.write(row, changes, 'ingest', { ...changes, metadata: update.metadata });
+    this.afterSave?.(row.id);
     return this.get(row.id);
   }
 
@@ -217,6 +226,14 @@ export class ItemService {
         since, limit,
       )
       .map((r) => r.id);
+  }
+
+  /** The item an importer already created from this source, so re-running an import doesn't duplicate. */
+  findImported(kind: string, path: string): string | null {
+    return this.ctx.get<{ id: string }>(
+      `SELECT id FROM items WHERE json_extract(metadata, '$.importedFrom.kind') = ? AND json_extract(metadata, '$.importedFrom.path') = ? LIMIT 1`,
+      kind, path,
+    )?.id ?? null;
   }
 
   /** Queues failed fetches/extractions for another attempt. Returns how many. */

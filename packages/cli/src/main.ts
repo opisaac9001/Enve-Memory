@@ -5,9 +5,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type ParseArgsConfig, parseArgs } from 'node:util';
-import { EnveMemory, MemoryError, type Settings, defaultHome, listBackups, pathsFor, restoreBackup } from '@enve-memory/core';
+import { EnveMemory, MemoryError, type RuleConditions, type Settings, defaultHome, listBackups, pathsFor, restoreBackup } from '@enve-memory/core';
 import { AiError, type AiProvider, PROVIDERS, PROVIDER_IDS, ask, createProvider, enrichItem, enrichWorker, envKeys, isProviderId, providerFor } from '@enve-memory/ai';
 import { attachLocalEmbedder, indexWorker } from '@enve-memory/embeddings';
+import { importBookmarks, importCsv, importEnveExport, importMarkdownFolder } from '@enve-memory/importers';
 import { ingestItem, processPending } from '@enve-memory/ingestion';
 import { DEFAULT_PORT, createApiServer, lanUrls, pairingLink } from '@enve-memory/api';
 import { SERVER_NAME, serveMemoryOverStdio } from '@enve-memory/mcp';
@@ -69,6 +70,20 @@ AI (optional; bring your own provider)
   accept <id>                  Apply an item's suggested tags and project
   ask <question…>              Answer from your library with numbered citations  [-p project]
 
+Bring things in
+  import bookmarks <file.html> Browser bookmark export; folders become tags  [-p project] [--archive fetches every page]
+  import markdown <folder>     A folder of Markdown notes or an Obsidian vault  [-p project]
+  import csv <file.csv>        Bookmark CSV (Raindrop, Pinboard, spreadsheets)  [-p project]
+  import enve <export-folder>  Restore an Enve Memory export, keeping ids and dates
+
+Automations
+  rules                        List rules
+  rules add <name>             When a saved item matches, tag it and/or file it
+                               conditions: [--type t] [--domain d]… [--keyword k]… [--from mcp:|api:…]
+                               actions:    [-t tag]… [-p project]
+  rules on|off|delete <id>
+  graph                        Items, projects and tags as nodes and edges (use --json)
+
 Your data
   export <folder>              Write everything as Markdown + JSON (plus original files)
   backup                       Take a snapshot now
@@ -125,6 +140,10 @@ const { values: opts, positionals } = parseCommandLine({
     content: { type: 'boolean' },
     retry: { type: 'boolean' },
     passphrase: { type: 'string' },
+    archive: { type: 'boolean' },
+    domain: { type: 'string', multiple: true },
+    keyword: { type: 'string', multiple: true },
+    from: { type: 'string' },
     limit: { type: 'string' },
     all: { type: 'boolean' },
     yes: { type: 'boolean' },
@@ -296,6 +315,25 @@ async function run(memory: EnveMemory): Promise<void> {
       const answer = await ask(memory, requireProvider(memory), text(0, 'question'), { project: opts.project });
       return emit(answer, format.answer(answer));
     }
+    case 'import': {
+      const [kind] = rest;
+      const source = resolve(arg(1, 'path'));
+      const result = kind === 'bookmarks' ? importBookmarks(memory, readFileSync(source, 'utf8'), { project: opts.project, archive: opts.archive })
+        : kind === 'markdown' ? importMarkdownFolder(memory, source, { project: opts.project })
+        : kind === 'csv' ? importCsv(memory, readFileSync(source, 'utf8'), { project: opts.project })
+        : kind === 'enve' ? importEnveExport(memory, source)
+        : null;
+      if (!result) throw new UsageError('Usage: import bookmarks|markdown|csv|enve <path>');
+      if (opts.archive) await processPending(memory, { limit: 1000 });
+      const failures = result.failed.slice(0, 10).map((f) => `  ${f.source}: ${f.error}`).join('\n');
+      return emit(result, `Imported ${result.created}, skipped ${result.skipped} already here${result.failed.length ? `, ${result.failed.length} failed:\n${failures}` : '.'}`);
+    }
+    case 'rules':
+      return runRules(memory);
+    case 'graph': {
+      const graph = memory.graph({ project: opts.project });
+      return emit(graph, `${graph.nodes.length} nodes, ${graph.edges.length} edges. Use --json for the data.`);
+    }
     case 'export': {
       const summary = memory.exports.write(resolve(text(0, 'folder')));
       return emit(summary, `Exported ${summary.items} items, ${summary.projects} projects and ${summary.files} files to ${summary.path}`);
@@ -399,6 +437,40 @@ async function runAi(memory: EnveMemory): Promise<void> {
   return emit(status, settings.aiProvider === 'none'
     ? 'AI is off. Everything else works without it. Turn it on with `enve-memory ai use <provider>`.'
     : `Provider  ${settings.aiProvider}${settings.aiBaseUrl ? ` at ${settings.aiBaseUrl}` : ''}\nModel     ${settings.aiModel}\nEnrich    ${settings.aiEnrich ? `on (items saved since ${settings.aiEnrichSince})` : 'off'}`);
+}
+
+function runRules(memory: EnveMemory): void {
+  const [sub, target] = rest;
+  switch (sub) {
+    case undefined:
+    case 'list': {
+      const rules = memory.rules.list();
+      return emit(rules, rules.map(format.ruleLine).join('\n') || 'No rules yet. Add one with `enve-memory rules add`.');
+    }
+    case 'add': {
+      const rule = memory.rules.create({
+        name: text(1, 'name'),
+        conditions: {
+          types: opts.type?.split(',').map((t) => t.trim()) as RuleConditions['types'],
+          domains: opts.domain,
+          keywords: opts.keyword,
+          source: opts.from,
+        },
+        actions: { tags: opts.tag, project: opts.project },
+      });
+      return emit(rule, `Added ${format.ruleLine(rule)}`);
+    }
+    case 'on':
+    case 'off': {
+      const rule = memory.rules.setEnabled(arg(1, 'id'), sub === 'on');
+      return emit(rule, format.ruleLine(rule));
+    }
+    case 'delete':
+      memory.rules.delete(arg(1, 'id'));
+      return emit({ deleted: target }, `Deleted rule ${target}`);
+    default:
+      throw new UsageError('Usage: rules [add|on|off|delete]');
+  }
 }
 
 function runClients(memory: EnveMemory): void {

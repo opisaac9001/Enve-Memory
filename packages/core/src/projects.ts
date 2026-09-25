@@ -30,6 +30,9 @@ export interface CreateProjectInput {
   name: string;
   description?: string;
   instructions?: string;
+  /** For importers restoring an export. */
+  id?: string;
+  createdAt?: string;
 }
 
 export interface UpdateProjectInput {
@@ -49,9 +52,9 @@ export class ProjectService {
   create(input: CreateProjectInput): Project {
     const name = required(input.name, 'Project name');
     const slug = this.availableSlug(name);
-    const now = this.ctx.now();
+    const now = input.createdAt ?? this.ctx.now();
     const project: Project = {
-      id: newId(),
+      id: input.id ?? newId(),
       name,
       slug,
       description: input.description?.trim() ?? '',

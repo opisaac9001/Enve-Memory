@@ -8,14 +8,15 @@ import { IN_MEMORY, openDatabase, schemaVersion } from './db.ts';
 import { DecisionService } from './decisions.ts';
 import { EmbeddingService } from './embeddings.ts';
 import { ExportService } from './export.ts';
-import { ItemService } from './items.ts';
+import { ItemService, MAX_LIMIT } from './items.ts';
 import { type MemoryPaths, defaultHome, pathsFor } from './paths.ts';
 import { ProjectService } from './projects.ts';
 import { SearchService } from './search.ts';
+import { RuleService } from './rules.ts';
 import { SettingsService } from './settings.ts';
 import { SyncService } from './sync.ts';
 import { TaskService } from './tasks.ts';
-import { ITEM_TYPES, type ItemType, type ProjectBriefing } from './types.ts';
+import { type Graph, ITEM_TYPES, type ItemType, type ProjectBriefing, type RelationKind } from './types.ts';
 
 export interface OpenOptions {
   /** Library folder. Defaults to the platform data directory (or $ENVE_MEMORY_HOME). */
@@ -41,6 +42,7 @@ export class EnveMemory {
   readonly backups: BackupService;
   readonly exports: ExportService;
   readonly sync: SyncService;
+  readonly rules: RuleService;
   readonly files: FileService;
   private readonly db: DatabaseSync;
   private readonly ctx: Context;
@@ -67,6 +69,8 @@ export class EnveMemory {
     this.backups = new BackupService(this.ctx, paths);
     this.exports = new ExportService(this.ctx, this.items, this.projects, this.decisions);
     this.sync = new SyncService(this.ctx, this.items, this.settings);
+    this.rules = new RuleService(this.ctx, this.items, this.projects);
+    this.items.afterSave = (id) => this.rules.apply(id);
     this.files = new FileService(this.ctx, this.items);
   }
 
@@ -113,6 +117,37 @@ export class EnveMemory {
       .all<{ name: string }>(`SELECT t.name FROM tags t LEFT JOIN item_tags it ON it.tag_id = t.id GROUP BY t.id ORDER BY count(it.item_id) DESC, t.name`)
       .map((r) => r.name);
     return { projects, tags: tagNames.length, tagNames, ...counts };
+  }
+
+  /**
+   * Items, projects and tags as a graph: explicit relations plus "in project" and "tagged" edges. Limited to the most
+   * recently updated items (at most MAX_LIMIT) so a large library stays drawable.
+   */
+  graph({ project, limit }: { project?: string; limit?: number } = {}): Graph {
+    const items = this.items.list({ project }, limit ?? MAX_LIMIT);
+    const ids = new Set(items.map((i) => i.id));
+    const nodes: Graph['nodes'] = items.map((i) => ({ id: i.id, kind: 'item', label: i.title || i.url || i.body.slice(0, 60) || i.type, type: i.type }));
+    const edges: Graph['edges'] = [];
+    const projectIds = new Set<string>();
+    for (const item of items) {
+      if (!item.project) continue;
+      projectIds.add(item.project.id);
+      edges.push({ from: item.id, to: item.project.id, kind: 'in_project' });
+    }
+    for (const p of this.projects.list()) if (projectIds.has(p.id)) nodes.push({ id: p.id, kind: 'project', label: p.name });
+    if (ids.size) {
+      const placeholders = [...ids].map(() => '?').join(', ');
+      const tagged = this.ctx.all<{ item_id: string; name: string }>(
+        `SELECT it.item_id, t.name FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id IN (${placeholders})`, ...ids,
+      );
+      for (const name of new Set(tagged.map((t) => t.name))) nodes.push({ id: `tag:${name}`, kind: 'tag', label: `#${name}` });
+      for (const t of tagged) edges.push({ from: t.item_id, to: `tag:${t.name}`, kind: 'tagged' });
+      const relations = this.ctx.all<{ from_id: string; to_id: string; kind: RelationKind }>(
+        `SELECT from_id, to_id, kind FROM relations WHERE from_id IN (${placeholders}) AND to_id IN (${placeholders})`, ...ids, ...ids,
+      );
+      for (const r of relations) edges.push({ from: r.from_id, to: r.to_id, kind: r.kind });
+    }
+    return { nodes, edges };
   }
 
   /** Everything an agent needs to pick up a project where the last one left off. */

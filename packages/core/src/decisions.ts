@@ -9,6 +9,9 @@ export interface RecordDecisionInput {
   decision: string;
   reason?: string;
   supersedes?: string[];
+  /** For importers restoring an export. */
+  id?: string;
+  createdAt?: string;
 }
 
 interface DecisionRow {
@@ -44,7 +47,9 @@ export class DecisionService {
       return row.id;
     });
     const id = this.ctx.tx(() => {
-      const id = this.items.insert({ type: 'decision', title: decision, body: input.reason, project: project.id });
+      const id = this.items.insert({
+        type: 'decision', title: decision, body: input.reason, project: project.id, id: input.id, createdAt: input.createdAt,
+      });
       for (const old of superseded) this.items.link(id, old, 'supersedes', project.id);
       return id;
     });

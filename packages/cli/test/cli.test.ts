@@ -104,6 +104,25 @@ test('two libraries sync through a shared folder from the command line', () => {
   assert.equal(cli(desktop, ['sync', sealed, '--passphrase', '-', '--json'], 'a long passphrase\n').code, 0);
 });
 
+test('import, rules and graph from the command line', () => {
+  const home = tempHome();
+  json(home, ['project', 'new', 'Development']);
+  const rule = json(home, ['rules', 'add', 'Code links', '--domain', 'github.com', '-t', 'code', '-p', 'development']);
+  assert.deepEqual(rule.conditions, { domains: ['github.com'] });
+
+  const bookmarks = join(home, 'bookmarks.html');
+  writeFileSync(bookmarks, '<DL><p><DT><H3>Dev</H3><DL><p><DT><A HREF="https://github.com/enve/memory">repo</A></DL><p></DL>');
+  assert.deepEqual(json(home, ['import', 'bookmarks', bookmarks]), { created: 1, skipped: 0, failed: [] });
+  const [repo] = json(home, ['list']);
+  assert.deepEqual(repo.project?.name, 'Development');
+
+  const detail = json(home, ['show', repo.id]);
+  assert.deepEqual(detail.tags, ['code', 'dev']);
+  assert.equal(json(home, ['rules', 'off', rule.id]).enabled, false);
+  assert.ok(json(home, ['graph']).nodes.length >= 3);
+  assert.equal(cli(home, ['import', 'pocket', bookmarks]).code, 2);
+});
+
 test('errors are reported with distinct exit codes', () => {
   const home = tempHome();
   assert.equal(cli(home, ['show', 'nope']).code, 1);

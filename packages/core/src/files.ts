@@ -16,6 +16,9 @@ export interface SaveFileInput {
   note?: string;
   project?: string;
   tags?: string[];
+  /** For importers restoring an export. */
+  id?: string;
+  createdAt?: string;
 }
 
 // Extracted text beyond this is left to the file itself; the index stays small.
@@ -68,6 +71,8 @@ export class FileService {
         metadata,
         project: input.project,
         tags: input.tags,
+        id: input.id,
+        createdAt: input.createdAt,
       });
       const attachment = { id: newId(), sha256, filename, mimeType, size: input.data.byteLength, createdAt: this.ctx.now() };
       this.ctx.run(
