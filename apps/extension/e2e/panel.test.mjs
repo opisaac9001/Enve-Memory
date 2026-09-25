@@ -30,7 +30,7 @@ describe('side panel, import, reminders and opens in Chromium', () => {
   };
   const rowTitles = (panel, list) => panel.locator(`${list} .row-title`).allTextContents();
 
-  test('This page: saved state, suggestions, reminder and pin with a capture-only token', async () => {
+  test('This page: saved state, suggestions, intent, reminder and pin with a capture-only token', async () => {
     const article = await env.api.lookup(articleUrl);
     await env.server.suggest(article.id, { summary: 'How Security+ 2.0 openers talk over one wire.', tags: ['rolling-code', 'esp32'] });
     await env.openTab('/article.html');
@@ -39,7 +39,6 @@ describe('side panel, import, reminders and opens in Chromium', () => {
     assert.match(await panel.locator('#page-status').innerText(), /^Saved .+ · Garage Door · #esp32$/);
     assert.equal(await panel.locator('#page-save').innerText(), 'Update');
     assert.ok(await panel.locator('#page-project').isHidden(), 'already filed');
-    assert.ok(await panel.locator('#page-intent button').first().isDisabled(), 'intent edits need write');
     assert.match(await panel.locator('#page-ai').innerText(), /one wire/);
     assert.equal(await panel.locator('#page-ai button:text("Accept suggestions")').count(), 0);
 
@@ -48,6 +47,15 @@ describe('side panel, import, reminders and opens in Chromium', () => {
     await panel.press('#page-note', 'ControlOrMeta+Enter');
     await until(async () => (await env.api.lookup(articleUrl)).tags.includes('rolling-code'), 'suggested tag saved');
     assert.match((await env.api.lookup(articleUrl)).body, /Check the bus timing\./);
+
+    await panel.click('#page-intent button:text("Watch")');
+    await until(async () => (await env.api.lookup(articleUrl)).intent === 'watch', 'intent changed by re-saving');
+    await panel.locator('#page-intent button:text("Watch")[aria-pressed="true"]').waitFor();
+    await panel.click('#page-intent button:text("Watch")');
+    await panel.waitForTimeout(300);
+    assert.equal((await env.api.lookup(articleUrl)).intent, 'watch', 'clearing an intent needs write');
+    await panel.click('#page-intent button:text("Revisit")');
+    await until(async () => (await env.api.lookup(articleUrl)).intent === 'revisit', 'intent restored');
 
     await panel.click('#page-remind button:text("Tomorrow")');
     await panel.locator('#page-reminder').filter({ hasText: 'Tomorrow' }).waitFor();
@@ -141,7 +149,7 @@ describe('side panel, import, reminders and opens in Chromium', () => {
     await panel.close();
   });
 
-  test('with a write token: Accept applies suggestions and intent changes apply at once', async () => {
+  test('with a write token: Accept, clearing an intent, unpinning and clearing a reminder', async () => {
     const writeToken = await env.server.token('Chrome (write)', 'read,write');
     await env.worker.evaluate((token) => chrome.storage.local.set({ token }), writeToken);
     try {
@@ -154,6 +162,9 @@ describe('side panel, import, reminders and opens in Chromium', () => {
 
       await panel.click('#page-intent button:text("Read")');
       await until(async () => (await env.api.lookup(env.siteUrl('/unsaved.html'))).intent === 'read', 'intent changed');
+      await panel.locator('#page-intent button:text("Read")[aria-pressed="true"]').waitFor();
+      await panel.click('#page-intent button:text("Read")');
+      await until(async () => (await env.api.lookup(env.siteUrl('/unsaved.html'))).intent === null, 'intent cleared with write');
       await panel.click('#pin');
       await until(async () => (await env.api.lookup(env.siteUrl('/unsaved.html'))).pinnedAt === null, 'unpinned');
       await panel.click('#clear-reminder');
@@ -179,6 +190,12 @@ describe('side panel, import, reminders and opens in Chromium', () => {
       { articleUrl, extra: 520 },
     );
 
+    const added = await env.worker.evaluate(async () => {
+      const [ratgdo] = await chrome.bookmarks.search({ url: 'https://github.com/ratgdo/esphome-ratgdo' });
+      return new Date(ratgdo.dateAdded).toISOString();
+    });
+    const articleCreated = (await env.api.lookup(articleUrl)).createdAt;
+
     const options = await env.openExtensionPage('options.html', { width: 900, height: 1400 });
     await options.click('#import');
     await options.locator('#import-result.ok').waitFor({ timeout: 20_000 });
@@ -188,6 +205,8 @@ describe('side panel, import, reminders and opens in Chromium', () => {
 
     assert.deepEqual((await env.api.lookup('https://github.com/ratgdo/esphome-ratgdo')).tags, ['esp32', 'garage-door']);
     assert.deepEqual((await env.api.lookup('https://envemedia.com/')).tags, []);
+    assert.equal((await env.api.lookup('https://github.com/ratgdo/esphome-ratgdo')).createdAt, added, 'keeps the bookmark date');
+    assert.equal((await env.api.lookup(articleUrl)).createdAt, articleCreated, 'an existing item keeps its own date');
     assert.ok((await env.api.lookup(articleUrl)).tags.includes('garage-door'), 'existing bookmark gains the folder tag');
     await options.close();
   });
@@ -208,12 +227,14 @@ describe('side panel, import, reminders and opens in Chromium', () => {
     await options.close();
   });
 
-  test('reminder notifications (opt-in): one per due item, and clicking opens it', async () => {
+  test('reminder notifications (opt-in): one per due item, handed off as delivered, and clicking opens it', async () => {
     const { item } = await env.api.capture({ url: env.siteUrl('/remind.html'), title: 'Opener firmware changelog', remind: new Date(Date.now() - 60_000).toISOString() });
     const notificationIds = () => env.worker.evaluate(async () => Object.keys(await chrome.notifications.getAll()));
     await env.worker.evaluate(() => chrome.storage.local.set({ notifyReminders: true }));
     await until(async () => (await notificationIds()).includes(`reminder:${item.id}`), 'reminder notification');
     assert.ok(await env.worker.evaluate(() => chrome.alarms.get('reminders')), 'reminder alarm scheduled');
+
+    await until(async () => !(await env.api.dueReminders()).some((due) => due.id === item.id), 'marked delivered on the server');
 
     await env.worker.evaluate((id) => chrome.notifications.clear(id), `reminder:${item.id}`);
     await env.worker.evaluate(() => chrome.alarms.onAlarm.dispatch({ name: 'reminders', scheduledTime: Date.now() }));

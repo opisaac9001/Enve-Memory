@@ -30,7 +30,7 @@ npm run build        # writes dist/chrome and dist/firefox
 
 3. The extension opens its Settings page on install. You can also right-click the toolbar button and choose **Options**. Paste the token, then click **Save**. The page tests the connection and shows the client name and scopes.
 
-`read,capture` is all the extension needs: `read` for projects, search, shelves and "already saved" lookups, and `capture` to save, pin, set reminders and record opens. With a `read,write` token you can also accept AI suggestions, change a saved item's intent, unpin and clear reminders. The token is kept in the extension's local storage in this browser profile and is never logged.
+`read,capture` is all the extension needs: `read` for projects, search, shelves and "already saved" lookups, and `capture` to save, set or change the intent, pin, set reminders, and record opens and delivered reminders. With a `read,write` token you can also accept AI suggestions, clear an intent, unpin and clear reminders. The token is kept in the extension's local storage in this browser profile and is never logged.
 
 The server URL defaults to `http://127.0.0.1:49231`. If you point it at another machine (for example `enve-memory serve --lan` over Tailscale), the browser asks for permission to reach that host when you save.
 
@@ -44,7 +44,7 @@ The server URL defaults to `http://127.0.0.1:49231`. If you point it at another 
   - pin it.
   - see the AI summary and suggested tags when Enve Memory's enrichment is on. Click a suggested tag to add it, or **Accept suggestions** with a write token.
 
-  Once a page is saved, the pin, reminder and intent controls apply straight away. The panel follows you as you switch tabs. The first time it may ask to see which tab you're on; addresses only go to your own Enve Memory.
+  Once a page is saved, the intent, reminder and pin controls apply straight away. The panel follows you as you switch tabs. The first time it may ask to see which tab you're on; addresses only go to your own Enve Memory.
 - **Related in your library:** saved items related to the current page.
 - **Library:** search (press <kbd>/</kbd>). A small label shows whether each hit matched by keyword or by meaning. Below the search are shelves: Recent, Pinned, Read, Watch, Buy, Unopened (30 days) and Reminders, with due reminders highlighted. The project picker scopes both search and shelves. Opening a result opens it in a new tab and records the open.
 - **Quick note:** jot a note into the scoped project (or Inbox) with <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Enter</kbd>.
@@ -58,9 +58,9 @@ The server URL defaults to `http://127.0.0.1:49231`. If you point it at another 
 **Settings** also has:
 
 - **Toolbar button:** choose whether it opens the popup or the side panel.
-- **Import browser bookmarks:** one click reads the browser's bookmark tree and sends it in batches of 500, with a progress bar and a created / already saved / failed summary. Folder names become tags; the browser's own top-level folders (Bookmarks bar, Other bookmarks…) are skipped. Pages you've already saved gain the tags instead of being duplicated, so running it again is safe. Whether pages are then fetched for full-text search follows Enve Memory's own settings.
+- **Import browser bookmarks:** one click reads the browser's bookmark tree and sends it in batches of 500, with a progress bar and a created / already saved / failed summary. Folder names become tags; the browser's own top-level folders (Bookmarks bar, Other bookmarks…) are skipped. New bookmarks keep the date you originally bookmarked them. Pages you've already saved gain the tags instead of being duplicated, and keep their own date, so running it again is safe. Whether pages are then fetched for full-text search follows Enve Memory's own settings.
 - **Mark saved links as opened when I visit them** (off by default): when you switch to a tab, its address is checked with Enve Memory's lookup, and a saved link is marked opened. Addresses only go to your own Enve Memory.
-- **Show reminder notifications** (off by default, because the desktop app notifies too): checks for due reminders every five minutes and shows one notification per reminder. Clicking it opens the page.
+- **Show reminder notifications** (off by default, because the desktop app notifies too): checks for due reminders every five minutes and shows one notification per reminder. Clicking it opens the page. Each reminder is marked delivered in Enve Memory, so it isn't shown again here or by the desktop app.
 
 Pages that aren't on the web (browser settings, `file:` pages) are saved as notes. You can change the shortcuts in the browser's extension shortcut settings.
 

@@ -108,8 +108,8 @@ function showExisting(item) {
   $('tag-input').placeholder = 'Add more tags';
   $('save').textContent = 'Update';
   intent.value = item.intent;
-  // Changing an existing item's intent is an edit, which needs the write scope.
-  intent.disabled = !canWrite();
+  // Re-saving can change the intent, but clearing it is an edit, which needs the write scope.
+  intent.required = Boolean(item.intent) && !canWrite();
   if (item.remindAt) $('reminder-set').textContent = `Set for ${formatWhen(item.remindAt)}`;
   renderSuggestions($('ai'), item, {
     canAccept: canWrite(),
@@ -162,7 +162,7 @@ async function save() {
     note: $('note').value,
     project,
     tags: tagList,
-    intent: existing ? undefined : intent.value,
+    intent: intent.value === existing?.intent ? undefined : intent.value,
     remind: remind.value && remindAt(remind.value),
   });
 
@@ -171,7 +171,7 @@ async function save() {
     if (!existing?.project) await saveSettings({ lastProject: project ? { id: project, name: select.selectedOptions[0].text } : null });
     if (result.queued) return showDone('Saved offline', 'It will sync when Enve Memory is back.');
     let { item } = result;
-    if (existing && canWrite() && intent.value !== existing.intent) item = await client.setIntent(item.id, intent.value);
+    if (existing?.intent && !intent.value && canWrite()) item = await client.setIntent(item.id, null);
     showDone(result.created ? 'Saved' : 'Updated', [item.project?.name ?? 'Inbox', ...item.tags.map((t) => `#${t}`)].join(' · '));
   } catch (error) {
     showError(error);

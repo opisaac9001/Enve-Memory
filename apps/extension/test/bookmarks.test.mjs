@@ -13,12 +13,12 @@ const TREE = [
         id: '1',
         title: 'Bookmarks bar',
         children: [
-          { id: '10', title: 'Enve', url: 'https://envemedia.com' },
+          { id: '10', title: 'Enve', url: 'https://envemedia.com', dateAdded: Date.UTC(2019, 4, 1) },
           {
             id: '11',
             title: 'Garage Door',
             children: [
-              { id: '12', title: 'Security+ 2.0', url: 'https://example.com/secplus' },
+              { id: '12', title: 'Security+ 2.0', url: 'https://example.com/secplus', dateAdded: Date.UTC(2024, 0, 2) },
               { id: '13', title: 'ESP32 Library', children: [{ id: '14', title: '  ratgdo  ', url: 'https://github.com/ratgdo' }] },
               { id: '15', title: 'bookmarklet', url: 'javascript:alert(1)' },
             ],
@@ -29,7 +29,7 @@ const TREE = [
         id: '2',
         title: 'Other bookmarks',
         children: [
-          { id: '20', title: 'Café Réseau 📚', children: [{ id: '21', title: '', url: 'https://example.com/secplus' }] },
+          { id: '20', title: 'Café Réseau 📚', children: [{ id: '21', title: '', url: 'https://example.com/secplus', dateAdded: Date.UTC(2023, 6, 3) }] },
           { id: '22', title: '📚', children: [{ id: '23', title: 'Emoji folder', url: 'http://example.org/' }] },
           { id: '24', title: 'Settings', url: 'chrome://settings/' },
         ],
@@ -46,10 +46,10 @@ test('folderTag matches the server tag normalization', () => {
   assert.equal(folderTag(`${'a'.repeat(63)} b`), 'a'.repeat(63));
 });
 
-test('bookmarkEntries maps folders to tags, skips browser roots and non-web links, and merges duplicates', () => {
+test('bookmarkEntries maps folders to tags and dateAdded to createdAt, skips browser roots and non-web links, and merges duplicates', () => {
   assert.deepEqual(bookmarkEntries(TREE), [
-    { url: 'https://envemedia.com/', title: 'Enve' },
-    { url: 'https://example.com/secplus', title: 'Security+ 2.0', tags: ['garage-door', 'cafe-reseau'] },
+    { url: 'https://envemedia.com/', title: 'Enve', createdAt: '2019-05-01T00:00:00.000Z' },
+    { url: 'https://example.com/secplus', title: 'Security+ 2.0', tags: ['garage-door', 'cafe-reseau'], createdAt: '2023-07-03T00:00:00.000Z' },
     { url: 'https://github.com/ratgdo', title: 'ratgdo', tags: ['garage-door', 'esp32-library'] },
     { url: 'http://example.org/', title: 'Emoji folder' },
   ]);

@@ -17,7 +17,8 @@ export function folderTag(name) {
 /**
  * Flattens `bookmarks.getTree()` into capture bodies. Folder names become tags, except the browser's own top-level
  * folders (Bookmarks bar, Other bookmarks…), which are skipped by position so it works in every language and browser.
- * Only web pages are kept, and a page filed in several folders is sent once with all their tags.
+ * Only web pages are kept, and a page filed in several folders is sent once with all their tags and its earliest date,
+ * which the server applies only to bookmarks it creates.
  */
 export function bookmarkEntries(tree) {
   const byUrl = new Map();
@@ -25,8 +26,9 @@ export function bookmarkEntries(tree) {
     if (node.url) {
       if (!isCapturableUrl(node.url)) return;
       const url = new URL(node.url).href;
-      const entry = byUrl.get(url) ?? { url, title: node.title?.trim() ?? '', tags: new Set() };
+      const entry = byUrl.get(url) ?? { url, title: node.title?.trim() ?? '', tags: new Set(), added: Infinity };
       for (const tag of tags) entry.tags.add(tag);
+      if (node.dateAdded < entry.added) entry.added = node.dateAdded;
       byUrl.set(url, entry);
       return;
     }
@@ -34,10 +36,11 @@ export function bookmarkEntries(tree) {
     for (const child of node.children ?? []) walk(child, tag ? [...tags, tag] : tags, depth + 1);
   };
   for (const root of tree) walk(root, [], 0);
-  return [...byUrl.values()].map(({ url, title, tags }) => ({
+  return [...byUrl.values()].map(({ url, title, tags, added }) => ({
     url,
     ...(title ? { title } : {}),
     ...(tags.size ? { tags: [...tags] } : {}),
+    ...(Number.isFinite(added) ? { createdAt: new Date(added).toISOString() } : {}),
   }));
 }
 

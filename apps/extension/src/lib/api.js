@@ -66,7 +66,7 @@ export function isRetryable(error) {
 }
 
 /** Builds a `/capture` body, dropping empty fields so the server applies its own defaults. */
-export function buildCapturePayload({ url, title, selection, note, project, tags, intent, remind, pinned } = {}) {
+export function buildCapturePayload({ url, title, selection, note, project, tags, intent, remind, pinned, createdAt } = {}) {
   const payload = {};
   if (isCapturableUrl(url)) payload.url = url;
   const trimmedTitle = title?.trim();
@@ -80,6 +80,7 @@ export function buildCapturePayload({ url, title, selection, note, project, tags
   if (INTENTS.includes(intent)) payload.intent = intent;
   if (remind) payload.remind = remind;
   if (pinned) payload.pinned = true;
+  if (createdAt) payload.createdAt = createdAt;
   return payload;
 }
 
@@ -185,6 +186,7 @@ export function createClient({ serverUrl, token, fetch = globalThis.fetch, timeo
     capture: (payload, { idempotencyKey } = {}) => request('POST', '/capture', { body: payload, idempotencyKey }),
     captureBatch: (items, { idempotencyKey } = {}) => request('POST', '/capture/batch', { body: { items }, idempotencyKey }),
     opened: (id) => request('POST', item(id, 'opened')),
+    reminded: (id) => request('POST', item(id, 'reminded')),
     pin: (id, pinned) => request('POST', item(id, 'pin'), { body: { pinned } }),
     setIntent: (id, intent) => request('PUT', item(id, 'intent'), { body: { intent } }),
     setReminder: (id, at) => request('PUT', item(id, 'reminder'), { body: { at } }),

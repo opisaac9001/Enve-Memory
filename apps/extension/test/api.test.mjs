@@ -97,6 +97,10 @@ describe('capture payloads', () => {
       pinned: true,
     });
     assert.deepEqual(buildCapturePayload({ url: 'https://a.test/', intent: 'someday', remind: null, pinned: false }), { url: 'https://a.test/' });
+    assert.deepEqual(buildCapturePayload({ url: 'https://a.test/', createdAt: '2019-05-01T00:00:00.000Z' }), {
+      url: 'https://a.test/',
+      createdAt: '2019-05-01T00:00:00.000Z',
+    });
   });
 
   test('queryString skips empty values and encodes the rest', () => {

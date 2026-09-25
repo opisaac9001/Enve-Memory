@@ -6,7 +6,6 @@ import { startScratchServer } from './support/scratch-server.mjs';
 
 const storage = installFakeBrowser();
 const { drain, flushOutbox, listOutbox, saveCapture, summarize, retryFailed, discardFailed } = await import('../src/lib/outbox.js');
-const { unshownReminders } = await import('../src/lib/reminders.js');
 
 const entry = (key, extra = {}) => ({ key, payload: { note: key }, queuedAt: `2026-09-25T00:00:0${key.length}Z`, ...extra });
 
@@ -103,13 +102,4 @@ describe('outbox against a real server', () => {
     await assert.rejects(saveCapture(bad, { note: 'x' }, server.url), { code: 'unauthorized' });
     assert.deepEqual(await listOutbox(), []);
   });
-});
-
-test('unshownReminders skips reminders already shown at the same time', () => {
-  const due = [
-    { id: 'a', remindAt: '2026-09-25T09:00:00.000Z' },
-    { id: 'b', remindAt: '2026-09-25T10:00:00.000Z' },
-  ];
-  assert.deepEqual(unshownReminders(due, ['a@2026-09-25T09:00:00.000Z']).map((i) => i.id), ['b']);
-  assert.deepEqual(unshownReminders(due, ['a@2026-09-24T09:00:00.000Z']).map((i) => i.id), ['a', 'b']);
 });

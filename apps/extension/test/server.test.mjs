@@ -99,9 +99,21 @@ describe('client against a real enve-memory serve', () => {
     assert.ok(ids(await client.items({ unopened: 0 })).includes(item.id));
     assert.ok(ids(await client.dueReminders()).includes(item.id));
 
+    await client.reminded(item.id);
+    assert.ok(!ids(await client.dueReminders()).includes(item.id), 'delivered reminders leave the due list');
+    assert.ok(ids(await client.items({ reminders: true })).includes(item.id), 'but stay on the shelf');
+
     await client.opened(item.id);
     assert.ok(!ids(await client.items({ unopened: 0 })).includes(item.id));
     assert.ok((await client.item(item.id)).openedAt);
+  });
+
+  test('re-saving with a capture-only token changes the intent', async () => {
+    const url = 'https://example.com/intent-change';
+    assert.equal((await client.capture({ url, intent: 'read' })).item.intent, 'read');
+    const { item, created } = await client.capture({ url, intent: 'buy' });
+    assert.equal(created, false);
+    assert.equal(item.intent, 'buy');
   });
 
   test('write-scope edits: unpin, intent, reminder; accept without suggestions is a readable 400', async () => {
@@ -127,15 +139,18 @@ describe('client against a real enve-memory serve', () => {
   test('bookmark import through /capture/batch: created, already saved and failed, and a replayed chunk', async () => {
     const tree = [{ id: '0', title: '', children: [{ id: '1', title: 'Bookmarks bar', children: [
       { id: '2', title: 'Garage Door', children: [
-        { id: '3', title: 'Security+', url: 'https://example.com/security-plus-2' },
-        { id: '4', title: 'Opener manual', url: 'https://example.com/manual' },
+        { id: '3', title: 'Security+', url: 'https://example.com/security-plus-2', dateAdded: Date.UTC(2020, 0, 1) },
+        { id: '4', title: 'Opener manual', url: 'https://example.com/manual', dateAdded: Date.UTC(2021, 5, 15, 12) },
       ] },
     ] }] }];
+    const originalDate = (await client.lookup('https://example.com/security-plus-2')).createdAt;
     const entries = [...bookmarkEntries(tree), { url: 'https://example.com/x', project: 'no-such-project' }];
     const totals = await importEntries(client, entries, { runId: 'server-test', size: 2 });
     assert.deepEqual({ created: totals.created, skipped: totals.skipped, failed: totals.failed }, { created: 1, skipped: 1, failed: 1 });
     assert.deepEqual((await client.lookup('https://example.com/security-plus-2')).tags, ['esp32', 'garage', 'garage-door', 'protocol']);
     assert.deepEqual((await client.lookup('https://example.com/manual')).tags, ['garage-door']);
+    assert.equal((await client.lookup('https://example.com/manual')).createdAt, '2021-06-15T12:00:00.000Z');
+    assert.equal((await client.lookup('https://example.com/security-plus-2')).createdAt, originalDate, 'only new bookmarks take the date');
 
     const replay = await importEntries(client, entries, { runId: 'server-test', size: 2 });
     assert.deepEqual({ created: replay.created, skipped: replay.skipped, failed: replay.failed }, { created: 1, skipped: 1, failed: 1 });

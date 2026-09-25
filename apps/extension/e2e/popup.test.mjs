@@ -82,7 +82,7 @@ describe('popup, Settings and instant saves in Chromium', () => {
     await article.evaluate(() => getSelection().removeAllRanges());
   });
 
-  test('popup recognises a saved page, appends to it, and offers AI suggestion tags', async () => {
+  test('popup recognises a saved page, appends to it, changes its intent, and offers AI suggestion tags', async () => {
     const article = await env.api.lookup(env.siteUrl('/article.html'));
     await env.server.suggest(article.id, { summary: 'How Security+ 2.0 openers talk over one wire.', tags: ['rolling-code', 'esp32'] });
 
@@ -92,7 +92,10 @@ describe('popup, Settings and instant saves in Chromium', () => {
     assert.equal(await popup.locator('#save').innerText(), 'Update');
     assert.ok(await popup.locator('#title-field').isHidden());
     assert.ok(await popup.locator('#project-field').isHidden());
-    assert.ok(await popup.locator('#intent button').first().isDisabled(), 'intent edits need the write scope');
+    assert.equal(await popup.getAttribute('#intent button:text("Read")', 'aria-pressed'), 'true');
+    await popup.click('#intent button:text("Read")');
+    assert.equal(await popup.getAttribute('#intent button:text("Read")', 'aria-pressed'), 'true', 'clearing an intent needs write');
+    await popup.click('#intent button:text("Revisit")');
     assert.match(await popup.locator('#reminder-set').innerText(), /Set for Tomorrow/);
 
     await popup.locator('#ai').waitFor();
@@ -107,6 +110,7 @@ describe('popup, Settings and instant saves in Chromium', () => {
     const item = await env.api.lookup(env.siteUrl('/article.html'));
     assert.deepEqual(item.tags, ['esp32', 'protocol', 'rolling-code']);
     assert.match(item.body, /Wall button uses it too\.$/);
+    assert.equal(item.intent, 'revisit', 'a capture-only token changes the intent by re-saving');
     await popup.close();
   });
 

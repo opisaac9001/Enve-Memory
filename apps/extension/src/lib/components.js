@@ -70,15 +70,19 @@ export function tagField(container, input) {
   };
 }
 
-/** A row of toggle chips where at most one is on. Clicking the selected chip turns it off. */
+/** A row of toggle chips where at most one is on. Clicking the selected chip turns it off unless `required` is set. */
 export function choiceChips(container, choices, { label, onChange } = {}) {
   let value = null;
+  let required = false;
   const buttons = choices.map((choice) =>
     h('button', {
       type: 'button',
       className: 'choice',
       textContent: choice.label,
-      onclick: () => set(value === choice.value ? null : choice.value, true),
+      onclick: () => {
+        if (value !== choice.value) set(choice.value, true);
+        else if (!required) set(null, true);
+      },
     }),
   );
   container.setAttribute('role', 'group');
@@ -99,8 +103,8 @@ export function choiceChips(container, choices, { label, onChange } = {}) {
     set value(next) {
       set(next);
     },
-    set disabled(disabled) {
-      for (const button of buttons) button.disabled = disabled;
+    set required(next) {
+      required = next;
     },
   };
 }

@@ -117,7 +117,7 @@ function wirePage() {
   tags = tagField($('page-chips'), $('page-tag-input'));
   intent = choiceChips($('page-intent'), INTENT_CHOICES, {
     label: 'Save for',
-    onChange: (value) => item && act(() => client.setIntent(item.id, value)),
+    onChange: (value) => item && act(() => (value ? captureNow({ intent: value }) : client.setIntent(item.id, null))),
   });
   remind = choiceChips($('page-remind'), REMIND_CHOICES, {
     label: 'Remind me',
@@ -194,8 +194,8 @@ function renderPage() {
     : 'Not saved yet';
 
   intent.value = item?.intent ?? null;
-  // Changing an existing item's intent or unpinning it are edits, which need the write scope.
-  intent.disabled = saved && !canWrite();
+  // Re-saving can set an intent or a pin, but clearing either is an edit, which needs the write scope.
+  intent.required = saved && Boolean(item.intent) && !canWrite();
   setPinned(saved ? Boolean(item.pinnedAt) : pinned);
   $('pin').disabled = saved && Boolean(item.pinnedAt) && !canWrite();
 
