@@ -1,0 +1,50 @@
+name: Bug report
+description: Something doesn't work the way it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting. Please don't include private content from your library; a minimal example is best. For security problems, use the Security tab instead.
+  - type: dropdown
+    id: part
+    attributes:
+      label: Where did it happen?
+      options:
+        - Desktop app
+        - Browser extension
+        - iOS app
+        - CLI
+        - MCP (an AI tool)
+        - Local HTTP API
+        - Sync
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. …\n2. …"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: "enve-memory --version, or the About screen"
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 26 (Apple Silicon), Windows 11, Ubuntu 26.04…
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error messages
+      render: text
