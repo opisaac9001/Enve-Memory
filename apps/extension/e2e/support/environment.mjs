@@ -8,8 +8,9 @@ import { createClient } from '../../src/lib/api.js';
 import { startScratchServer } from '../../test/support/scratch-server.mjs';
 
 // Built by `npm run test:e2e` with the optional permissions pre-granted: nothing can click the browser's prompt.
-const EXTENSION = fileURLToPath(new URL('../../dist/chrome-e2e', import.meta.url));
-export const docsPath = (name) => fileURLToPath(new URL(`../../docs/${name}`, import.meta.url));
+const EXTENSION = fileURLToPath(new URL('../../dist/chrome-pregranted', import.meta.url));
+/** Screenshots taken along the way, for looking at a failed run; git-ignored. The repo's screenshots come from `npm run screenshots`. */
+export const artifactPath = (name) => fileURLToPath(new URL(`../../test-results/${name}`, import.meta.url));
 
 const page = (title, body = '') => `<!doctype html><title>${title}</title><h1>${title}</h1>${body}`;
 const PAGES = {

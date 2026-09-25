@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { docsPath, selectText, startEnvironment, until } from './support/environment.mjs';
+import { artifactPath, selectText, startEnvironment, until } from './support/environment.mjs';
 
 describe('popup, Settings and instant saves in Chromium', () => {
   let env;
@@ -61,7 +61,7 @@ describe('popup, Settings and instant saves in Chromium', () => {
     await popup.press('#tag-input', 'Enter');
     await popup.fill('#note', 'Needed for the bench-test rig.');
     assert.deepEqual(await popup.locator('.chip').allTextContents(), ['#esp32×', '#protocol×']);
-    await popup.locator('body').screenshot({ path: docsPath('popup.png') });
+    await popup.locator('body').screenshot({ path: artifactPath('popup.png') });
 
     await popup.press('#note', 'ControlOrMeta+Enter');
     await popup.locator('#done').waitFor();

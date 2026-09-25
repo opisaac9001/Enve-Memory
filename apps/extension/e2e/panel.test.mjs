@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { docsPath, startEnvironment, until } from './support/environment.mjs';
+import { artifactPath, startEnvironment, until } from './support/environment.mjs';
 
 describe('side panel, import, reminders and opens in Chromium', () => {
   let env;
@@ -113,13 +113,13 @@ describe('side panel, import, reminders and opens in Chromium', () => {
 
     await panel.selectOption('#scope', { label: 'All projects' });
     await shelf('Recent');
-    await panel.screenshot({ path: docsPath('sidepanel-dark.png'), fullPage: true });
+    await panel.screenshot({ path: artifactPath('sidepanel-dark.png'), fullPage: true });
     // Reload so form controls pick up the light scheme from the start, as a light-mode browser would render them.
     await panel.emulateMedia({ colorScheme: 'light' });
     await panel.reload();
     await panel.locator('#related .row').first().waitFor();
     await panel.locator('#results .row').first().waitFor();
-    await panel.screenshot({ path: docsPath('sidepanel-light.png'), fullPage: true });
+    await panel.screenshot({ path: artifactPath('sidepanel-light.png'), fullPage: true });
     await panel.close();
   });
 

@@ -37,10 +37,15 @@ const targets = {
   },
 };
 
-// Tests can't click the browser's permission prompt, so their build holds the optional permissions from the start.
-if (process.argv.includes('--e2e')) {
-  const { optional_permissions, ...rest } = base;
-  targets['chrome-e2e'] = { ...rest, permissions: [...base.permissions, ...optional_permissions] };
+// Automation (e2e tests, screenshots) can't click the browser's permission prompts, so this build holds every
+// optional permission from the start.
+if (process.argv.includes('--pregranted')) {
+  const { optional_permissions, optional_host_permissions, ...rest } = base;
+  targets['chrome-pregranted'] = {
+    ...rest,
+    permissions: [...base.permissions, ...optional_permissions],
+    host_permissions: [...base.host_permissions, ...optional_host_permissions],
+  };
 }
 
 await rm(dist, { recursive: true, force: true });

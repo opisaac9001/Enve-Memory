@@ -179,17 +179,23 @@ a.row:focus-visible {
   font-weight: 400;
 }
 
+/* Every detail gets a leading "·"; the row is shifted left by one separator and clipped, so the one that starts each
+   line (including a wrapped line) is hidden. */
 .row-meta {
+  --separator: 14px;
   display: flex;
   flex-wrap: wrap;
-  gap: 0 6px;
+  margin-left: calc(-1 * var(--separator));
+  clip-path: inset(0 0 0 var(--separator));
   color: var(--text-3);
   font-size: 12px;
 }
 
-.row-meta > * + *::before {
+.row-meta > *::before {
   content: "·";
-  margin-right: 6px;
+  display: inline-block;
+  width: var(--separator);
+  text-align: center;
 }
 
 .row-meta .due {

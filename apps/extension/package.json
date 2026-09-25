@@ -11,7 +11,8 @@
     "build": "node scripts/build.mjs",
     "icons": "node scripts/icons.mjs",
     "test": "node --test \"test/*.test.mjs\"",
-    "test:e2e": "node scripts/build.mjs --e2e && node --test --test-concurrency=1 \"e2e/*.test.mjs\""
+    "test:e2e": "node scripts/build.mjs --pregranted && node --test --test-concurrency=1 \"e2e/*.test.mjs\"",
+    "screenshots": "node scripts/build.mjs --pregranted && node scripts/screenshots.mjs"
   },
   "devDependencies": {
     "playwright": "^1.63.0"
