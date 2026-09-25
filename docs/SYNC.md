@@ -6,6 +6,7 @@ Enve Memory syncs a library between computers through a **folder you already syn
 enve-memory sync ~/Library/Mobile\ Documents/com~apple~CloudDocs/Enve\ Memory   # set the folder and sync now
 enve-memory sync                                                               # sync again
 enve-memory sync off                                                           # stop (nothing is deleted)
+enve-memory sync <new empty folder> --passphrase -                             # encrypted sync; reads the passphrase from stdin
 ```
 
 The desktop app and `serve` sync every 2 minutes while a folder is set. Implementation: [`packages/core/src/sync.ts`](../packages/core/src/sync.ts). Tests: [`packages/core/test/sync.test.ts`](../packages/core/test/sync.test.ts).
@@ -43,12 +44,17 @@ A record also carries `base`: the version the writing device had last exchanged 
 - Applied changes go into the change log attributed to the remote device and actor, so Activity shows what came from where, and they're never echoed back.
 - Attachment bytes travel through `blobs/`. A row that arrives before its bytes gets them on a later run.
 
+## Encryption
+
+With a passphrase, everything written to the folder (segments and file blobs) is sealed with AES-256-GCM under a key derived with scrypt (N = 2¹⁶, r = 8). The folder's `sync.json` holds only the salt and a sealed verifier, so a wrong passphrase is rejected without touching anything. The derived key is kept in the library's settings on each device, never in the folder.
+
+The first device to set a passphrase on an empty folder creates the key, and every other device enters the same passphrase. An existing unencrypted folder can't be converted in place; start a new, empty one. Without a passphrase the folder holds readable JSON and files, fine for a folder only you can reach (Syncthing between your own machines), but not ideal for a cloud drive.
+
 ## Not synced
 
 API client tokens, settings (fetch, AI provider, sync folder), the semantic index (each device rebuilds its own), and backups.
 
 ## Not yet
 
-- **Encryption at rest in the shared folder:** a library passphrase, with segments and blobs sealed before they leave the machine. Until then the folder holds readable data, so use a folder only you can access.
 - **Segment compaction** for very long-lived libraries.
 - **A LAN peer transport** for machines without a shared folder.

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -167,4 +167,40 @@ test('a device whose clock runs an hour slow still orders its later edits after 
 
   assert.equal(a.items.get(note.id).body, 'edited later on the slow clock');
   assert.equal(a.search.query('conflicting').length, 0);
+});
+
+test('an encrypted sync folder holds no readable data and needs the passphrase', () => {
+  const folder = temp('sealed');
+  const open = (label: string) => {
+    const memory = EnveMemory.open({ home: temp(label), actor: label });
+    memory.settings.set('syncFolder', folder);
+    return memory;
+  };
+  const a = open('a');
+  a.sync.setPassphrase('correct horse battery');
+  assert.equal(a.sync.encrypted, true);
+  const note = a.items.saveNote({ body: 'the garage code is 4417' });
+  const file = a.files.save({ data: new TextEncoder().encode('secret schematic'), filename: 'schematic.txt' }).item;
+  a.sync.run();
+
+  const everything = (dir: string): string[] => readdirSync(dir, { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? everything(join(dir, e.name)) : [readFileSync(join(dir, e.name), 'latin1')]));
+  const stored = everything(folder).join('\n');
+  assert.equal(stored.includes('4417'), false);
+  assert.equal(stored.includes('secret schematic'), false);
+  assert.equal(stored.includes('schematic.txt'), false);
+
+  const b = open('b');
+  assert.throws(() => b.sync.run(), /encrypted\. Enter its passphrase/);
+  assert.throws(() => b.sync.setPassphrase('wrong passphrase'), /does not match/);
+  b.sync.setPassphrase('correct horse battery');
+  b.sync.run();
+  assert.equal(b.items.get(note.id).body, 'the garage code is 4417');
+  assert.equal(b.files.read(file.id).data.toString(), 'secret schematic');
+
+  const plainFolder = temp('plain');
+  const c = EnveMemory.open({ home: temp('c'), actor: 'c' });
+  c.sync.run(plainFolder);
+  assert.throws(() => c.sync.setPassphrase('correct horse battery', plainFolder), /already holds unencrypted/);
+  assert.throws(() => c.sync.setPassphrase('short', temp('empty')), /at least 8/);
 });

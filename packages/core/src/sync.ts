@@ -1,4 +1,5 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import type { SQLInputValue } from 'node:sqlite';
@@ -41,6 +42,40 @@ const ITEM_FIELDS = ['id', 'type', 'title', 'body', 'url', 'content', 'metadata'
 const PROJECT_FIELDS = ['id', 'name', 'slug', 'description', 'instructions', 'memory', 'status', 'created_at', 'updated_at'];
 const APPLY_ORDER: Record<Entity, number> = { project: 0, item: 1, relation: 2 };
 const EXPORTED_SEQ = 'sync.exported_seq';
+const KEY_SETTING = 'sync.key';
+const MARKER = 'sync.json';
+const VERIFIER = 'enve-memory sync key check';
+// scrypt cost: ~64 MB and a fraction of a second, once per device.
+const SCRYPT = { N: 2 ** 16, r: 8, p: 1, maxmem: 128 * 1024 * 1024 };
+
+interface Marker {
+  version: 1;
+  encryption: { kdf: 'scrypt'; salt: string; verifier: string } | null;
+}
+
+/** AES-256-GCM: 12-byte IV, 16-byte tag, then ciphertext. */
+class Sealer {
+  private readonly key: Buffer;
+
+  constructor(key: Buffer) {
+    this.key = key;
+  }
+
+  seal(plain: Buffer): Buffer {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', this.key, iv);
+    const body = Buffer.concat([cipher.update(plain), cipher.final()]);
+    return Buffer.concat([iv, cipher.getAuthTag(), body]);
+  }
+
+  open(sealed: Buffer): Buffer {
+    const decipher = createDecipheriv('aes-256-gcm', this.key, sealed.subarray(0, 12));
+    decipher.setAuthTag(sealed.subarray(12, 28));
+    return Buffer.concat([decipher.update(sealed.subarray(28)), decipher.final()]);
+  }
+}
+
+const deriveKey = (passphrase: string, salt: Buffer) => scryptSync(passphrase.normalize('NFKC'), salt, 32, SCRYPT);
 
 /**
  * Folder sync between devices (iCloud Drive, Dropbox, Syncthing, a network share). Each device appends
@@ -52,6 +87,7 @@ export class SyncService {
   private readonly ctx: Context;
   private readonly items: ItemService;
   private readonly settings: SettingsService;
+  private sealer: Sealer | null = null;
 
   constructor(ctx: Context, items: ItemService, settings: SettingsService) {
     this.ctx = ctx;
@@ -59,9 +95,66 @@ export class SyncService {
     this.settings = settings;
   }
 
+  /**
+   * Encrypts everything this library puts in the folder. The first device to set a passphrase on an empty folder
+   * creates its key; every other device must enter the same passphrase. An existing unencrypted folder can't be
+   * converted in place: start a new, empty one.
+   */
+  setPassphrase(passphrase: string, folder = this.settings.get('syncFolder')): void {
+    if (!folder) throw invalid('Choose a sync folder first.');
+    if (passphrase.length < 8) throw invalid('Use a passphrase of at least 8 characters.');
+    const marker = readMarker(folder);
+    if (marker && !marker.encryption) {
+      throw invalid('This folder already holds unencrypted sync data. Choose a new, empty folder for encrypted sync.');
+    }
+    let key: Buffer;
+    if (marker?.encryption) {
+      key = deriveKey(passphrase, Buffer.from(marker.encryption.salt, 'base64'));
+      try {
+        if (new Sealer(key).open(Buffer.from(marker.encryption.verifier, 'base64')).toString() !== VERIFIER) throw new Error();
+      } catch {
+        throw invalid('That passphrase does not match the one this sync folder was set up with.');
+      }
+    } else {
+      mkdirSync(folder, { recursive: true });
+      const salt = randomBytes(16);
+      key = deriveKey(passphrase, salt);
+      const verifier = new Sealer(key).seal(Buffer.from(VERIFIER)).toString('base64');
+      writeMarker(folder, { version: 1, encryption: { kdf: 'scrypt', salt: salt.toString('base64'), verifier } });
+    }
+    this.ctx.run(
+      `INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+      KEY_SETTING, key.toString('hex'),
+    );
+  }
+
+  get encrypted(): boolean {
+    return this.ctx.get(`SELECT 1 FROM settings WHERE key = ?`, KEY_SETTING) !== undefined;
+  }
+
+  /** Forgets the key (e.g. when stopping sync); the folder's data is untouched. */
+  forgetKey(): void {
+    this.ctx.run(`DELETE FROM settings WHERE key = ?`, KEY_SETTING);
+  }
+
+  private sealerFor(folder: string): Sealer | null {
+    const marker = readMarker(folder);
+    const hex = this.ctx.get<{ value: string }>(`SELECT value FROM settings WHERE key = ?`, KEY_SETTING)?.value;
+    if (!marker) {
+      if (hex) throw invalid('The sync folder is missing its setup file. Set the passphrase again to reinitialize it.');
+      mkdirSync(folder, { recursive: true });
+      writeMarker(folder, { version: 1, encryption: null });
+      return null;
+    }
+    if (marker.encryption && !hex) throw invalid('This sync folder is encrypted. Enter its passphrase to sync with it.');
+    if (!marker.encryption && hex) throw invalid('This sync folder is not encrypted, but this library expects encryption. Choose the right folder or stop syncing.');
+    return hex ? new Sealer(Buffer.from(hex, 'hex')) : null;
+  }
+
   run(folder = this.settings.get('syncFolder')): SyncResult {
     if (!folder) throw invalid('Choose a sync folder first.');
     if (!this.ctx.attachmentsDir) throw invalid('In-memory libraries cannot sync.');
+    this.sealer = this.sealerFor(folder);
     const dir = join(folder, 'devices', this.ctx.deviceId);
     mkdirSync(dir, { recursive: true });
     mkdirSync(join(folder, 'blobs'), { recursive: true });
@@ -94,7 +187,7 @@ export class SyncService {
     const dir = join(folder, 'devices', this.ctx.deviceId);
     const name = `${String(lastSeq).padStart(12, '0')}.ndjson`;
     // Write then rename, so a reader never sees half a segment from this device.
-    writeFileSync(join(dir, `.${name}.tmp`), `${records.map((r) => JSON.stringify(r)).join('\n')}\n`);
+    writeFileSync(join(dir, `.${name}.tmp`), this.pack(Buffer.from(`${records.map((r) => JSON.stringify(r)).join('\n')}\n`)));
     renameSync(join(dir, `.${name}.tmp`), join(dir, name));
     this.ctx.tx(() => {
       for (const r of records) {
@@ -119,7 +212,7 @@ export class SyncService {
       for (const segment of segments) {
         let records: SyncRecord[];
         try {
-          records = readFileSync(join(devicesDir, device, segment), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as SyncRecord);
+          records = this.unpack(readFileSync(join(devicesDir, device, segment))).toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as SyncRecord);
         } catch {
           // A cloud folder can deliver a file before it's complete; try again next run.
           break;
@@ -273,12 +366,20 @@ export class SyncService {
     );
   }
 
+  private pack(plain: Buffer): Buffer {
+    return this.sealer ? this.sealer.seal(plain) : plain;
+  }
+
+  private unpack(stored: Buffer): Buffer {
+    return this.sealer ? this.sealer.open(stored) : stored;
+  }
+
   private exportBlobs(folder: string, state: ItemState): void {
     for (const attachment of state.attachments) {
       const target = join(folder, 'blobs', attachment.sha256 as string);
       const source = blobPath(this.ctx, attachment.sha256 as string);
       if (!existsSync(target) && existsSync(source)) {
-        copyFileSync(source, `${target}.tmp`);
+        writeFileSync(`${target}.tmp`, this.pack(readFileSync(source)));
         renameSync(`${target}.tmp`, target);
       }
     }
@@ -290,9 +391,25 @@ export class SyncService {
       const local = blobPath(this.ctx, sha256);
       const remote = join(folder, 'blobs', sha256);
       if (existsSync(local) || !existsSync(remote)) continue;
+      let bytes: Buffer;
+      try {
+        bytes = this.unpack(readFileSync(remote));
+      } catch {
+        continue;
+      }
       mkdirSync(join(local, '..'), { recursive: true });
-      copyFileSync(remote, `${local}.tmp`);
+      writeFileSync(`${local}.tmp`, bytes);
       renameSync(`${local}.tmp`, local);
     }
   }
+}
+
+function readMarker(folder: string): Marker | null {
+  const path = join(folder, MARKER);
+  return existsSync(path) ? (JSON.parse(readFileSync(path, 'utf8')) as Marker) : null;
+}
+
+function writeMarker(folder: string, marker: Marker): void {
+  writeFileSync(join(folder, `.${MARKER}.tmp`), JSON.stringify(marker, null, 2));
+  renameSync(join(folder, `.${MARKER}.tmp`), join(folder, MARKER));
 }

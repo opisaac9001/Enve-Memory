@@ -74,6 +74,7 @@ Your data
   backup                       Take a snapshot now
   backups                      List snapshots (taken automatically while the app or \`serve\` runs)
   sync [folder]                Sync through a shared folder (iCloud Drive, Dropbox, Syncthing…); a folder argument sets it
+                               --passphrase - reads a passphrase from stdin and encrypts everything in the folder
   sync off                     Stop syncing
   restore <file|latest> --yes  Replace the library with a snapshot; the current state is snapshotted first.
                                Quit the desktop app, \`serve\` and AI clients first.
@@ -123,6 +124,7 @@ const { values: opts, positionals } = parseCommandLine({
     'base-url': { type: 'string' },
     content: { type: 'boolean' },
     retry: { type: 'boolean' },
+    passphrase: { type: 'string' },
     limit: { type: 'string' },
     all: { type: 'boolean' },
     yes: { type: 'boolean' },
@@ -302,9 +304,14 @@ async function run(memory: EnveMemory): Promise<void> {
       const [target] = rest;
       if (target === 'off') {
         memory.settings.set('syncFolder', '');
+        memory.sync.forgetKey();
         return emit({ syncFolder: null }, 'Sync is off. Nothing was removed from the shared folder.');
       }
       if (target) memory.settings.set('syncFolder', resolve(target));
+      if (opts.passphrase !== undefined) {
+        const passphrase = opts.passphrase === '-' ? readFileSync(0, 'utf8').replace(/\r?\n$/, '') : opts.passphrase;
+        memory.sync.setPassphrase(passphrase);
+      }
       const result = memory.sync.run();
       return emit({ folder: memory.settings.get('syncFolder'), ...result },
         `Synced with ${result.devices} other device${result.devices === 1 ? '' : 's'} through ${memory.settings.get('syncFolder')}: sent ${result.exported}, received ${result.imported}${result.conflicts ? `, kept ${result.conflicts} conflicting edit${result.conflicts === 1 ? '' : 's'} as notes` : ''}.`);

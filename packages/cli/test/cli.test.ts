@@ -95,6 +95,13 @@ test('two libraries sync through a shared folder from the command line', () => {
   assert.equal(json(desktop, ['show', note.id]).source, 'cli');
   assert.equal(json(desktop, ['sync', 'off']).syncFolder, null);
   assert.equal(cli(desktop, ['sync']).code, 1);
+
+  const sealed = tempHome();
+  assert.equal(cli(laptop, ['sync', sealed, '--passphrase', '-', '--json'], 'a long passphrase\n').code, 0);
+  const locked = cli(desktop, ['sync', sealed]);
+  assert.equal(locked.code, 1);
+  assert.match(locked.stderr, /encrypted/);
+  assert.equal(cli(desktop, ['sync', sealed, '--passphrase', '-', '--json'], 'a long passphrase\n').code, 0);
 });
 
 test('errors are reported with distinct exit codes', () => {
