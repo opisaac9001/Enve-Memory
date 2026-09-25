@@ -13,6 +13,10 @@ struct TasksView: View {
     @State private var error: String?
     @State private var loaded = false
     @State private var completing: Set<String> = []
+    @State private var hasMore = false
+    @State private var loadingMore = false
+
+    private let pageSize = 50
 
     private struct Group: Identifiable {
         let id: String
@@ -43,6 +47,14 @@ struct TasksView: View {
                         .textCase(nil)
                         .padding(.top, HearthSpacing.sm)
                 }
+            }
+            if hasMore {
+                // The List is lazy, so this row appears only when scrolled to the end.
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .task { await loadMore() }
             }
         }
         .listStyle(.plain)
@@ -114,7 +126,9 @@ struct TasksView: View {
     private func load() async {
         guard let client = connection.client else { return }
         do {
-            tasks = try await client.tasks(status: .active)
+            let page = try await client.tasks(status: .active, limit: pageSize)
+            tasks = page
+            hasMore = page.count == pageSize
             completing = []
             error = nil
         } catch is CancellationError {
@@ -123,6 +137,23 @@ struct TasksView: View {
             self.error = error.localizedDescription
         }
         loaded = true
+    }
+
+    private func loadMore() async {
+        guard let client = connection.client, !loadingMore else { return }
+        loadingMore = true
+        defer { loadingMore = false }
+        do {
+            let page = try await client.tasks(status: .active, limit: pageSize, offset: tasks.count)
+            let known = Set(tasks.map(\.id))
+            tasks += page.filter { !known.contains($0.id) }
+            hasMore = page.count == pageSize
+        } catch is CancellationError {
+            return
+        } catch {
+            hasMore = false
+            self.error = error.localizedDescription
+        }
     }
 
     private func complete(_ task: Item) {

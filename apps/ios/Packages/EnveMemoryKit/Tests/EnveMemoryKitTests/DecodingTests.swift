@@ -30,6 +30,14 @@ import Testing
         #expect(Set(items.map(\.type)).isSuperset(of: [.note, .bookmark, .task, .file, .decision]))
     }
 
+    @Test func pageCursorKeepsTheServersTimestampVerbatim() throws {
+        let items = try decode([Item].self, "items")
+        let json = try JSONSerialization.jsonObject(with: Fixture.data("items")) as! [[String: Any]]
+        for (item, raw) in zip(items, json) {
+            #expect(item.pageCursor == "\(raw["updatedAt"] as! String),\(raw["id"] as! String)")
+        }
+    }
+
     @Test func fractionalTimestamps() throws {
         let item = try #require(try decode([Item].self, "items").first)
         let components = Calendar(identifier: .gregorian).dateComponents(in: TimeZone(identifier: "UTC")!, from: item.createdAt)

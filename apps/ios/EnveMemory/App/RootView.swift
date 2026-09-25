@@ -47,6 +47,7 @@ struct MainView: View {
     @Environment(Router.self) private var router
     @Environment(Connection.self) private var connection
     @Environment(OutboxService.self) private var outbox
+    @Environment(ProjectStore.self) private var projects
     @Environment(\.hearth) private var hearth
 
     private let dockHeight: CGFloat = 92
@@ -68,6 +69,11 @@ struct MainView: View {
         .sheet(item: $router.capture) { kind in
             CaptureSheet(initialKind: kind)
                 .environment(\.hearth, hearth)
+        }
+        .task(id: connection.pairing) {
+            // Keeps the share sheet's project list current for this library.
+            projects.reset()
+            try? await projects.load(connection.client)
         }
         .task(id: outbox.pendingCount) {
             // While something is waiting, keep trying on the backoff schedule.

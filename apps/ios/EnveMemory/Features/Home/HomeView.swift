@@ -10,6 +10,10 @@ struct HomeView: View {
     @State private var items: [Item] = []
     @State private var loadError: String?
     @State private var loaded = false
+    @State private var hasMore = false
+    @State private var loadingMore = false
+
+    private let pageSize = 30
 
     var body: some View {
         HearthScreen(title: "Home", overline: statusLine) {
@@ -44,13 +48,23 @@ struct HomeView: View {
                 Button { router.open(.item(item.id)) } label: { ItemRow(item: item) }
                     .buttonStyle(.plain)
             }
+            if hasMore {
+                Button { Task { await loadMore() } } label: {
+                    if loadingMore { ProgressView() } else { Text("Show older") }
+                }
+                .buttonStyle(.hearthSecondary)
+                .disabled(loadingMore)
+                .accessibilityIdentifier("ShowOlder")
+            }
         }
     }
 
     private func load() async {
         guard let client = connection.client else { return }
         do {
-            items = try await client.items(ItemFilter(limit: 30))
+            let page = try await client.items(ItemFilter(limit: pageSize))
+            items = page
+            hasMore = page.count == pageSize
             loadError = nil
             if !connection.isOnline { await connection.refresh() }
         } catch is CancellationError {
@@ -60,6 +74,21 @@ struct HomeView: View {
             connection.note(error)
         }
         loaded = true
+    }
+
+    private func loadMore() async {
+        guard let client = connection.client, let last = items.last, !loadingMore else { return }
+        loadingMore = true
+        defer { loadingMore = false }
+        do {
+            let page = try await client.items(ItemFilter(limit: pageSize, before: last.pageCursor))
+            let known = Set(items.map(\.id))
+            items += page.filter { !known.contains($0.id) }
+            hasMore = page.count == pageSize
+        } catch {
+            router.show(error.localizedDescription)
+            connection.note(error)
+        }
     }
 }
 

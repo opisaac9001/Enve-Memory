@@ -64,6 +64,7 @@ final class Connection {
 
     func adopt(_ pairing: Pairing) throws {
         try store.save(pairing)
+        forgetServerCaches()
         self.pairing = pairing
         status = .unknown
         revision += 1
@@ -71,6 +72,7 @@ final class Connection {
 
     func unpair() throws {
         try store.delete()
+        forgetServerCaches()
         pairing = nil
         status = .unknown
     }
@@ -83,6 +85,13 @@ final class Connection {
         } else if case .unreachable = error {
             status = .offline(error.localizedDescription)
         }
+    }
+
+    /// Project ids belong to one library; after re-pairing, the share sheet mustn't offer the old ones.
+    private func forgetServerCaches() {
+        let settings = SharedSettings()
+        settings.cachedProjects = []
+        settings.lastProjectID = nil
     }
 
     func didWrite() {

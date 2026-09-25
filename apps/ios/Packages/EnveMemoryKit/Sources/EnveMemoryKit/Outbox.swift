@@ -10,6 +10,8 @@ public struct OutboxEntry: Codable, Hashable, Identifiable, Sendable {
     public let kind: Kind
     public let title: String
     public let endpoint: Endpoint
+    /// Sent as `Idempotency-Key` on every attempt, so the server applies the write once however often it's retried.
+    public let idempotencyKey: String
     /// File name of the upload body inside the outbox directory.
     public let attachment: String?
     public var attempts: Int
@@ -37,9 +39,13 @@ public actor Outbox {
         self.now = now
     }
 
-    /// Moves `attachment` (if any) into the outbox, so the caller's copy may be temporary.
+    /// Moves `attachment` (if any) into the outbox, so the caller's copy may be temporary. Keeps the endpoint's
+    /// idempotency key when it has one: a direct attempt whose response was lost must retry under the same key.
     @discardableResult
     public func enqueue(_ endpoint: Endpoint, kind: OutboxEntry.Kind, title: String, attachment: URL? = nil) throws -> OutboxEntry {
+        var endpoint = endpoint
+        let key = endpoint.idempotencyKey ?? Endpoint.newKey()
+        endpoint.headers[Endpoint.idempotencyHeader] = key
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let id = UUID()
         var attachmentName: String?
@@ -50,7 +56,7 @@ public actor Outbox {
         }
         // Strictly increasing (at the millisecond precision we persist) so a multi-file share keeps its order.
         let createdAt = max(now(), (entries().last?.createdAt ?? .distantPast).addingTimeInterval(0.001))
-        let entry = OutboxEntry(id: id, createdAt: createdAt, kind: kind, title: title, endpoint: endpoint, attachment: attachmentName,
+        let entry = OutboxEntry(id: id, createdAt: createdAt, kind: kind, title: title, endpoint: endpoint, idempotencyKey: key, attachment: attachmentName,
                                 attempts: 0, nextAttemptAt: now(), lastError: nil, needsAttention: false)
         try write(entry)
         return entry

@@ -36,6 +36,28 @@ import Testing
         #expect(client.urlRequest(for: .tasks()).url?.query() == "status=active")
     }
 
+    @Test func pagingParameters() {
+        #expect(client.urlRequest(for: .tasks(limit: 50, offset: 100)).url?.query() == "status=active&limit=50&offset=100")
+        let items = client.urlRequest(for: .items(ItemFilter(limit: 30, before: "2026-09-25T05:31:54.065Z,01a0d70c-7951")))
+        #expect(items.url?.query(percentEncoded: true) == "limit=30&before=2026-09-25T05%3A31%3A54.065Z%2C01a0d70c-7951")
+    }
+
+    @Test func everyWriteCarriesItsOwnIdempotencyKey() throws {
+        let writes: [Endpoint] = [
+            try .capture(CaptureRequest(note: "n")),
+            try .createItem(NewItemRequest(type: .task, title: "t")),
+            .upload(FileUpload(filename: "a.txt", mimeType: "text/plain")),
+            .completeTask("id"),
+        ]
+        let keys = writes.compactMap(\.idempotencyKey)
+        #expect(keys.count == writes.count)
+        #expect(Set(keys).count == keys.count)
+        #expect(keys.allSatisfy { (1...128).contains($0.count) })
+        #expect(client.urlRequest(for: writes[0]).value(forHTTPHeaderField: "Idempotency-Key") == keys[0])
+        #expect(Endpoint.items().idempotencyKey == nil)
+        #expect(Endpoint.search("x").idempotencyKey == nil)
+    }
+
     @Test func captureBodyOmitsMissingFields() throws {
         let endpoint = try Endpoint.capture(CaptureRequest(url: "https://example.com", title: "Example", tags: ["a", "b"]))
         let request = client.urlRequest(for: endpoint)

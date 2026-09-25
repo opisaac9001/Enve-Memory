@@ -123,7 +123,7 @@ public struct TaskFields: Codable, Hashable, Sendable {
 }
 
 /// A list row. Task lists add `task`; plain item lists omit it.
-public struct Item: Codable, Hashable, Identifiable, Sendable {
+public struct Item: Decodable, Hashable, Identifiable, Sendable {
     public let id: String
     public let type: ItemType
     public let title: String
@@ -136,6 +136,32 @@ public struct Item: Codable, Hashable, Identifiable, Sendable {
     public let updatedAt: Date
     public let archivedAt: Date?
     public let task: TaskFields?
+    /// `updatedAt` exactly as the server sent it; the paging cursor compares strings, so a re-formatted date could skip items.
+    public let updatedAtStamp: String
+
+    /// The `before` cursor for the page after this item.
+    public var pageCursor: String { "\(updatedAtStamp),\(id)" }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, type, title, body, url, project, source, metadata, createdAt, updatedAt, archivedAt, task
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        type = try c.decode(ItemType.self, forKey: .type)
+        title = try c.decode(String.self, forKey: .title)
+        body = try c.decode(String.self, forKey: .body)
+        url = try c.decodeIfPresent(String.self, forKey: .url)
+        project = try c.decodeIfPresent(ProjectRef.self, forKey: .project)
+        source = try c.decode(String.self, forKey: .source)
+        metadata = try c.decode(ItemMetadata.self, forKey: .metadata)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        updatedAtStamp = try c.decode(String.self, forKey: .updatedAt)
+        archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
+        task = try c.decodeIfPresent(TaskFields.self, forKey: .task)
+    }
 }
 
 public struct Attachment: Codable, Hashable, Identifiable, Sendable {
@@ -208,7 +234,7 @@ public struct Decision: Codable, Hashable, Identifiable, Sendable {
     public var isSuperseded: Bool { supersededBy != nil }
 }
 
-public struct ProjectBriefing: Codable, Hashable, Sendable {
+public struct ProjectBriefing: Decodable, Hashable, Sendable {
     public let project: Project
     public let decisions: [Decision]
     public let openTasks: [Item]

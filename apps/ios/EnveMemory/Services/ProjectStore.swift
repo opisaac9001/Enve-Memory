@@ -12,6 +12,11 @@ final class ProjectStore {
         projects.isEmpty ? settings.cachedProjects : projects.map(\.ref)
     }
 
+    /// Drops the in-memory list after re-pairing; `refs` falls back to the (cleared) shared cache until the next load.
+    func reset() {
+        projects = []
+    }
+
     func load(_ client: APIClient?) async throws {
         guard let client else { return }
         projects = try await client.projects()

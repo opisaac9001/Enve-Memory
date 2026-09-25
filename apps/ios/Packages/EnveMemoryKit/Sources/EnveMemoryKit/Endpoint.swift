@@ -28,13 +28,21 @@ public struct Endpoint: Codable, Hashable, Sendable {
         })
     }
 
+    /// Every write is born with its own key, so a retry of the same value (direct attempt, then outbox) never writes twice.
     static func json(_ method: String, _ path: String, _ body: some Encodable) throws -> Endpoint {
-        Endpoint(method: method, path: path, headers: ["Content-Type": "application/json"], body: try JSONCoding.makeEncoder().encode(body))
+        Endpoint(method: method, path: path, headers: ["Content-Type": "application/json", idempotencyHeader: newKey()],
+                 body: try JSONCoding.makeEncoder().encode(body))
     }
 
     static func post(_ path: String) -> Endpoint {
-        Endpoint(method: "POST", path: path)
+        Endpoint(method: "POST", path: path, headers: [idempotencyHeader: newKey()])
     }
+
+    public static let idempotencyHeader = "Idempotency-Key"
+
+    static func newKey() -> String { UUID().uuidString.lowercased() }
+
+    public var idempotencyKey: String? { headers[Self.idempotencyHeader] }
 }
 
 public struct CaptureRequest: Codable, Hashable, Sendable {
@@ -102,16 +110,19 @@ public struct ItemFilter: Hashable, Sendable {
     public var type: ItemType?
     public var tag: String?
     public var limit: Int?
+    /// `Item.pageCursor` of the last item on the previous page (`/items` only).
+    public var before: String?
 
-    public init(project: String? = nil, type: ItemType? = nil, tag: String? = nil, limit: Int? = nil) {
+    public init(project: String? = nil, type: ItemType? = nil, tag: String? = nil, limit: Int? = nil, before: String? = nil) {
         self.project = project
         self.type = type
         self.tag = tag
         self.limit = limit
+        self.before = before
     }
 
     var query: [(String, String?)] {
-        [("project", project), ("type", type?.rawValue), ("tag", tag), ("limit", limit.map(String.init))]
+        [("project", project), ("type", type?.rawValue), ("tag", tag), ("limit", limit.map(String.init)), ("before", before)]
     }
 }
 
@@ -133,8 +144,9 @@ extension Endpoint {
     public static let projects = get("/projects")
     public static func briefing(_ ref: String) -> Endpoint { get("/projects/\(segment(ref))") }
 
-    public static func tasks(project: String? = nil, status: TaskListStatus = .active) -> Endpoint {
-        get("/tasks", [("project", project), ("status", status.rawValue)])
+    public static func tasks(project: String? = nil, status: TaskListStatus = .active, limit: Int? = nil, offset: Int = 0) -> Endpoint {
+        get("/tasks", [("project", project), ("status", status.rawValue), ("limit", limit.map(String.init)),
+                       ("offset", offset > 0 ? String(offset) : nil)])
     }
 
     public static func capture(_ request: CaptureRequest) throws -> Endpoint { try json("POST", "/capture", request) }
@@ -142,7 +154,7 @@ extension Endpoint {
     public static func completeTask(_ id: String) -> Endpoint { post("/tasks/\(segment(id))/complete") }
 
     public static func upload(_ file: FileUpload) -> Endpoint {
-        var headers = ["Content-Type": file.mimeType, "X-Filename": percentEncoded(file.filename)]
+        var headers = ["Content-Type": file.mimeType, "X-Filename": percentEncoded(file.filename), idempotencyHeader: newKey()]
         if let title = file.title, !title.isEmpty { headers["X-Title"] = percentEncoded(title) }
         if let note = file.note, !note.isEmpty { headers["X-Note"] = percentEncoded(note) }
         if let project = file.project, !project.isEmpty { headers["X-Project"] = percentEncoded(project) }

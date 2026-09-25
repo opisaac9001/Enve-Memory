@@ -92,6 +92,38 @@ final class TestClock: @unchecked Sendable {
         #expect(await outbox.entries().isEmpty)
     }
 
+    @Test func enqueueKeepsTheKeyOfADirectAttempt() async throws {
+        let endpoint = try note("lost response")
+        let entry = try await outbox.enqueue(endpoint, kind: .note, title: "x")
+        #expect(entry.idempotencyKey == endpoint.idempotencyKey)
+        #expect(entry.endpoint.idempotencyKey == entry.idempotencyKey)
+        let reloaded = try #require(await Outbox(directory: directory).entries().first)
+        #expect(reloaded.idempotencyKey == endpoint.idempotencyKey)
+    }
+
+    @Test func enqueueAddsAKeyWhenTheEndpointHasNone() async throws {
+        let bare = Endpoint(method: "POST", path: "/capture", body: Data("{}".utf8))
+        let entry = try await outbox.enqueue(bare, kind: .note, title: "x")
+        #expect(!entry.idempotencyKey.isEmpty)
+        #expect(entry.endpoint.idempotencyKey == entry.idempotencyKey)
+    }
+
+    /// The double-send case: the server applied the write but the response never arrived.
+    @Test func retriesAfterALostResponseReuseTheKey() async throws {
+        let server = StubServer { _ in throw URLError(.networkConnectionLost) }
+        let outbox = self.outbox
+        let endpoint = try note("once only")
+        _ = try? await server.client().data(for: endpoint)
+        try await outbox.enqueue(endpoint, kind: .note, title: "once only")
+
+        server.setResponse { _ in (201, try Fixture.data("capture-note")) }
+        let report = await outbox.flush(using: server.client(), ignoringBackoff: true)
+        #expect(report.sent == 1)
+        let keys = server.requests.map { $0.request.value(forHTTPHeaderField: "Idempotency-Key") }
+        #expect(keys.count == 2)
+        #expect(keys[0] != nil && keys[0] == keys[1])
+    }
+
     @Test func backoffDoublesAndCaps() {
         #expect(Outbox.backoff(afterAttempts: 1) == 30)
         #expect(Outbox.backoff(afterAttempts: 2) == 60)
