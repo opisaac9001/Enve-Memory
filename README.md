@@ -1,8 +1,24 @@
-# Enve Memory
+<p align="center">
+  <img src="docs/assets/logo.png" width="96" alt="Enve Memory">
+</p>
 
-**An open, local memory layer for you and your AI tools.**
+<h1 align="center">Enve Memory</h1>
 
-Save links, notes, files, tasks and decisions once. Find them yourself, or let Claude, Codex, ChatGPT, Cursor or any other MCP client find and use them. Every assistant reads and writes the same library, and that library is a single SQLite file on your computer. No account, no subscription, no cloud.
+<p align="center">
+  <strong>One memory for you and every AI you use.</strong><br>
+  Save links, notes, files and decisions once. Claude, Codex, ChatGPT and any MCP client read and write the same library, and it lives on your computer.
+</p>
+
+<p align="center">
+  <a href="LICENSE.md"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-f5921a"></a>
+  <img alt="Local-first" src="https://img.shields.io/badge/local--first-no%20account-2d2218">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-2026--07--28-2d2218">
+  <img alt="Platforms" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20iOS%20%C2%B7%20Chrome%20%C2%B7%20Firefox-2d2218">
+</p>
+
+<p align="center">
+  <img src="docs/assets/hero.png" alt="Enve Memory on the desktop, in the browser side panel and on iPhone">
+</p>
 
 ## What you get
 
@@ -15,6 +31,82 @@ Save links, notes, files, tasks and decisions once. Find them yourself, or let C
 - **Automations.** For example, "links from github.com → #code, file into Development".
 - **Sync between your computers** through a folder you already sync (iCloud Drive, Dropbox, Syncthing), with optional passphrase encryption. Concurrent edits never lose text.
 - **Yours to keep.** Automatic hourly, daily and monthly backups; Export Everything to Markdown, JSON and the original files; importers for browser bookmarks, Markdown folders or Obsidian vaults, bookmark CSVs, and Enve exports.
+
+## Screenshots
+
+### Desktop
+
+| | |
+|---|---|
+| ![Home](docs/screenshots/desktop/home.png) | ![Project briefing](docs/screenshots/desktop/project.png) |
+| **Home.** Quick capture, reminders, recent items. | **Project briefing.** Instructions, a living memory document, tasks: what an AI reads first. |
+| ![Decision log](docs/screenshots/desktop/project-decisions.png) | ![Archived page](docs/screenshots/desktop/item.png) |
+| **Decision log.** Append-only; replaced decisions stay visible as history. | **Archived pages.** The readable text is saved locally, next to your note, tags and reminder. |
+| ![Search](docs/screenshots/desktop/search.png) | ![Inbox](docs/screenshots/desktop/inbox.png) |
+| **Search by meaning.** "How does the remote avoid replay attacks" finds the rolling-code article. | **Inbox with AI suggestions.** Summaries, tags and a project to accept, or file automatically. |
+| ![Activity](docs/screenshots/desktop/activity.png) | ![Graph](docs/screenshots/desktop/graph.png) |
+| **Activity.** Which AI did what: Claude Code, Codex, the extension, your phone. | **Graph.** Items, projects and tags, connected. |
+| ![AI tools](docs/screenshots/desktop/settings-ai-tools.png) | ![Devices](docs/screenshots/desktop/settings-devices.png) |
+| **Connect AI tools.** One-click setup for Claude Code, Codex and JSON-configured clients. | **Devices.** Scoped tokens and QR pairing for your phone. |
+
+### Browser extension
+
+![Side panel beside a page](docs/screenshots/extension/panel-in-browser.png)
+
+| | | |
+|---|---|---|
+| ![Side panel](docs/screenshots/extension/sidepanel.png) | ![Popup](docs/screenshots/extension/popup.png) | ![Import](docs/screenshots/extension/import.png) |
+| **Side panel.** This page, related items from your library, and shelves. | **Popup.** Save with project, tags, intent, reminder and the selected text. | **One-click import** of your browser's bookmarks, folders becoming tags. |
+
+### iPhone
+
+| | | | |
+|---|---|---|---|
+| ![Home](docs/screenshots/ios/home.png) | ![Project](docs/screenshots/ios/project.png) | ![Item](docs/screenshots/ios/item.png) | ![Share sheet](docs/screenshots/ios/share.png) |
+| Home and shelves | Project briefing | Archived page | Save from any app |
+
+## Install
+
+- **Desktop (macOS):** download the `.dmg` for Apple Silicon or Intel from [Releases](../../releases). Builds are signed but not yet notarized, so the first time, right-click the app and choose **Open**. Intel Macs use keyword search: the local embedding runtime has no Intel build.
+- **Windows and Linux:** installers are configured (NSIS, AppImage, deb). Build them with `npm --prefix apps/desktop run dist:win` or `dist:linux` on that OS.
+- **Browser extension:** run `node apps/extension/scripts/build.mjs`, then load `apps/extension/dist/chrome` in `chrome://extensions` (Developer mode → Load unpacked). Firefox: load `dist/firefox` from `about:debugging`. Create a token in the desktop app under Settings → Devices.
+- **iPhone:** open `apps/ios` with XcodeGen and Xcode, set your team, and run. Pair by scanning the QR code in Settings → Devices.
+- **CLI and MCP server only:** Node 24+, then `npm install` in this repository (see *Try it* below).
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph You
+    D[Desktop app]
+    E[Browser extension]
+    P[iPhone + share sheet]
+    C[CLI]
+  end
+  subgraph AI["AI tools"]
+    CC[Claude Code]
+    CX[Codex]
+    O[ChatGPT, Cursor, …]
+  end
+  D --> Core
+  C --> Core
+  E -- "local API · scoped token" --> Core
+  P -- "local API over LAN / Tailscale" --> Core
+  CC -- "MCP (stdio)" --> Core
+  CX -- "MCP (stdio)" --> Core
+  O -- "MCP (HTTP)" --> Core
+  Core["Enve Memory core<br/>services · rules · workers"] --> DB[("memory.sqlite<br/>FTS5 + vectors")]
+  Core --> Files[("attachments/<br/>backups/")]
+  Core -. optional .-> LLM["Your AI provider<br/>(Ollama, OpenAI, Anthropic…)"]
+  Core -. optional .-> Sync[("Shared folder<br/>encrypted sync")]
+```
+
+Every client goes through the same core services, so the rules hold everywhere:
+
+- every change is logged, with the client that made it
+- decisions are append-only
+- nothing an AI does can delete your data
+- saved content is always treated as data, never as instructions
 
 ## Try it
 
