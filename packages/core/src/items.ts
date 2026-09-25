@@ -14,6 +14,8 @@ export interface ItemFilter {
   project?: string;
   /** Only items in no project. */
   inbox?: boolean;
+  /** Paging cursor: `<updatedAt>,<id>` of the last item of the previous page (see pageCursor). */
+  before?: string;
   type?: string;
   tag?: string;
   includeArchived?: boolean;
@@ -63,6 +65,9 @@ export interface UpdateItemInput {
   url?: string | null;
   project?: string | null;
 }
+
+/** The cursor that fetches the page after the one ending with this item. */
+export const pageCursor = (item: Pick<Item, 'updatedAt' | 'id'>) => `${item.updatedAt},${item.id}`;
 
 export const DEFAULT_LIMIT = 50;
 export const MAX_LIMIT = 200;
@@ -259,7 +264,7 @@ export class ItemService {
       .all<ItemRow>(
         `SELECT ${ITEM_COLUMNS} FROM ${ITEM_FROM}
          ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-         ORDER BY i.updated_at DESC, i.seq DESC LIMIT ?`,
+         ORDER BY i.updated_at DESC, i.id DESC LIMIT ?`,
         ...params, clampLimit(limit),
       )
       .map(toItem);
@@ -364,6 +369,12 @@ export class ItemService {
     const params: SQLInputValue[] = [];
     if (!filter.includeArchived) where.push('i.archived_at IS NULL');
     if (filter.inbox) where.push('i.project_id IS NULL');
+    if (filter.before) {
+      const [updatedAt, id] = filter.before.split(',');
+      if (!updatedAt || !id) throw invalid('"before" must be "<updatedAt>,<id>" from the last item of the previous page.');
+      where.push('(i.updated_at, i.id) < (?, ?)');
+      params.push(updatedAt, id);
+    }
     if (filter.project !== undefined) {
       where.push('i.project_id = ?');
       params.push(this.projects.resolve(filter.project).id);

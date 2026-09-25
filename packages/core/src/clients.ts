@@ -16,6 +16,7 @@ interface ClientRow {
 
 const TOKEN_PREFIX = 'em_';
 const LAST_USED_RESOLUTION_MS = 60_000;
+const IDEMPOTENCY_WINDOW_MS = 86_400_000;
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
@@ -65,6 +66,24 @@ export class ClientService {
     const client = this.get(id);
     if (!client.revokedAt) this.ctx.run(`UPDATE api_clients SET revoked_at = ? WHERE id = ?`, this.ctx.now(), id);
     return this.get(id);
+  }
+
+  /** A write's stored response, if this client already sent this idempotency key within the last day. */
+  recall(clientId: string, key: string): { status: number; body: string } | null {
+    return this.ctx.get<{ status: number; body: string }>(
+      `SELECT status, body FROM idempotency WHERE client_id = ? AND key = ? AND created_at > ?`,
+      clientId, key, new Date(Date.now() - IDEMPOTENCY_WINDOW_MS).toISOString(),
+    ) ?? null;
+  }
+
+  remember(clientId: string, key: string, status: number, body: string): void {
+    const now = new Date();
+    this.ctx.run(`DELETE FROM idempotency WHERE created_at <= ?`, new Date(now.getTime() - IDEMPOTENCY_WINDOW_MS).toISOString());
+    this.ctx.run(
+      `INSERT INTO idempotency (client_id, key, status, body, created_at) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (client_id, key) DO UPDATE SET status = excluded.status, body = excluded.body, created_at = excluded.created_at`,
+      clientId, key, status, body, now.toISOString(),
+    );
   }
 
   /** Returns the active client for a bearer token, or null. */

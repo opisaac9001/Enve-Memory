@@ -6,7 +6,7 @@ export { MIGRATIONS, type Migration } from './migrations.ts';
 export { toFtsQuery } from './search.ts';
 export { normalizeTag } from './context.ts';
 export { type Embedder, type VectorHit, chunkText } from './embeddings.ts';
-export { MAX_LIMIT } from './items.ts';
+export { MAX_LIMIT, pageCursor } from './items.ts';
 export type { ItemFilter, SaveLinkInput, SaveNoteInput, SourceUpdate, UpdateItemInput } from './items.ts';
 export { EXTRACTABLE_TYPES, type SaveFileInput } from './files.ts';
 export { isPlainText, mimeFor } from './mime.ts';

@@ -235,4 +235,18 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT;
     `,
   },
+  {
+    name: 'idempotency',
+    sql: `
+      -- Responses to writes that carried an Idempotency-Key, so a client retrying after a lost response gets the same answer.
+      CREATE TABLE idempotency (
+        client_id TEXT NOT NULL,
+        key TEXT NOT NULL,
+        status INTEGER NOT NULL,
+        body TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (client_id, key)
+      ) STRICT;
+    `,
+  },
 ];

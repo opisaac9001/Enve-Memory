@@ -163,3 +163,31 @@ test('pairing links carry the server, token and device name', () => {
   assert.equal(link.searchParams.get('token'), 'em_abc');
   assert.equal(link.searchParams.get('name'), "Isaac's iPhone");
 });
+
+test('an Idempotency-Key makes retried writes safe', async () => {
+  const headers = { 'Idempotency-Key': 'phone-outbox-42' };
+  const first = await call('POST', '/api/v1/capture', writer, { selection: 'sent twice by a flaky network' }, headers);
+  const retry = await call('POST', '/api/v1/capture', writer, { selection: 'sent twice by a flaky network' }, headers);
+  assert.equal(retry.status, 201);
+  assert.equal(retry.headers.get('idempotent-replayed'), 'true');
+  assert.equal(retry.data.item.id, first.data.item.id);
+  assert.equal(memory.search.query('flaky network').length, 1);
+
+  const other = await call('POST', '/api/v1/capture', extension, { selection: 'sent twice by a flaky network' }, headers);
+  assert.notEqual(other.data.item.id, first.data.item.id, 'keys are per client');
+  assert.equal((await call('POST', '/api/v1/capture', writer, {}, { 'Idempotency-Key': 'x'.repeat(200) })).status, 400);
+});
+
+test('lists page with a before cursor and an offset', async () => {
+  const project = await call('POST', '/api/v1/projects', writer, { name: 'Paging' });
+  for (let i = 0; i < 5; i++) await call('POST', '/api/v1/items', writer, { type: 'task', title: `Task ${i}`, project: project.data.slug });
+  const firstPage = (await call('GET', '/api/v1/items?project=paging&limit=2', reader)).data;
+  const last = firstPage.at(-1);
+  const secondPage = (await call('GET', `/api/v1/items?project=paging&limit=2&before=${encodeURIComponent(`${last.updatedAt},${last.id}`)}`, reader)).data;
+  assert.equal(secondPage.length, 2);
+  assert.equal(new Set([...firstPage, ...secondPage].map((i: { id: string }) => i.id)).size, 4);
+  const tasks = (await call('GET', '/api/v1/tasks?project=paging&limit=2&offset=4', reader)).data;
+  assert.equal(tasks.length, 1);
+  assert.equal((await call('GET', '/api/v1/tasks?offset=-1', reader)).status, 400);
+  assert.equal((await call('GET', '/api/v1/items?before=garbage', reader)).status, 400);
+});

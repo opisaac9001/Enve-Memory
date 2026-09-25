@@ -60,7 +60,7 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
       if (req.method === 'OPTIONS') {
         res.writeHead(204, {
           'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Authorization, Content-Type, Mcp-Session-Id, Mcp-Protocol-Version, X-Filename, X-Title, X-Note, X-Project, X-Tags',
+          'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key, Mcp-Session-Id, Mcp-Protocol-Version, X-Filename, X-Title, X-Note, X-Project, X-Tags',
           'Access-Control-Max-Age': '600',
         });
         return res.end();
@@ -79,8 +79,17 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
         return await mcpNode(req, res);
       }
 
+      const idempotencyKey = req.method === 'GET' || req.method === 'HEAD' ? undefined : idempotencyKeyOf(req);
+      // A client retrying after a lost response gets the original answer instead of a second copy.
+      const replay = idempotencyKey ? memory.clients.recall(client.id, idempotencyKey) : null;
+      const respond = (status: number, result: unknown) => {
+        if (idempotencyKey && status < 300) memory.clients.remember(client.id, idempotencyKey, status, JSON.stringify(result));
+        send(res, status, result);
+      };
+
       if (url.pathname === '/api/v1/files' && req.method === 'POST') {
         requireScope(client, 'capture');
+        if (replay) return replayResponse(res, replay);
         memory.actor = `api:${client.name}`;
         const result = memory.files.save({
           data: await readBody(req, MAX_FILE_BODY),
@@ -92,10 +101,10 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
           tags: header(req, 'x-tags')?.split(',').map((t) => t.trim()).filter(Boolean),
         });
         changed();
-        return send(res, 201, result);
+        return respond(201, result);
       }
       const download = /^\/api\/v1\/items\/([^/]+)\/file$/.exec(url.pathname);
-      if (download && req.method === 'GET') {
+      if (download && (req.method === 'GET' || req.method === 'HEAD')) {
         requireScope(client, 'read');
         const { attachment, path } = memory.files.primary(decodeURIComponent(download[1]!));
         res.writeHead(200, {
@@ -105,17 +114,19 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
           'X-Content-Type-Options': 'nosniff',
           'Cache-Control': 'private, max-age=31536000, immutable',
         });
+        if (req.method === 'HEAD') return void res.end();
         return void createReadStream(path).pipe(res);
       }
 
       const match = matchRoute(req.method ?? 'GET', url.pathname);
       if (!match) throw new HttpError(404, 'not_found', `No route for ${req.method} ${url.pathname}.`);
       if (match.route.scope) requireScope(client, match.route.scope);
+      if (replay) return replayResponse(res, replay);
       const body = req.method === 'GET' ? undefined : await readJson(req);
       memory.actor = `api:${client.name}`;
       const result = match.route.handle({ memory, client, params: match.params, query: url.searchParams, body });
       if (req.method !== 'GET') changed();
-      send(res, match.route.status ?? 200, result);
+      respond(match.route.status ?? 200, result);
     } catch (error) {
       sendError(res, error);
     }
@@ -216,6 +227,20 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   } catch {
     throw new HttpError(400, 'invalid_json', 'Request body must be a JSON object.');
   }
+}
+
+function idempotencyKeyOf(req: IncomingMessage): string | undefined {
+  const value = req.headers['idempotency-key'];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !value.trim() || value.length > 128) {
+    throw new HttpError(400, 'invalid', 'Idempotency-Key must be 1–128 characters.');
+  }
+  return value.trim();
+}
+
+function replayResponse(res: ServerResponse, stored: { status: number; body: string }): void {
+  res.writeHead(stored.status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Idempotent-Replayed': 'true' });
+  res.end(stored.body);
 }
 
 function send(res: ServerResponse, status: number, data: unknown): void {

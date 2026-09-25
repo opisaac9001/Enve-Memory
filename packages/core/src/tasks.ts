@@ -105,7 +105,7 @@ export class TaskService {
     return this.update(id, { status: 'done' });
   }
 
-  list({ project, status = 'active', tag }: { project?: string; status?: string; tag?: string } = {}, limit?: number): Task[] {
+  list({ project, status = 'active', tag, offset = 0 }: { project?: string; status?: string; tag?: string; offset?: number } = {}, limit?: number): Task[] {
     const { where, params } = this.items.filterClauses({ project, tag, type: 'task' });
     const listStatus = oneOf<TaskListStatus>(status, [...TASK_STATUSES, 'active', 'all'], 'task status');
     if (listStatus === 'active') {
@@ -120,8 +120,8 @@ export class TaskService {
         `SELECT ${ITEM_COLUMNS} FROM ${ITEM_FROM}
          WHERE ${where.join(' AND ')}
          ORDER BY t.due_at IS NULL, t.due_at, t.priority, i.seq
-         LIMIT ?`,
-        ...params, clampLimit(limit),
+         LIMIT ? OFFSET ?`,
+        ...params, clampLimit(limit), Math.max(0, Math.trunc(offset)),
       )
       .map(toTask);
   }

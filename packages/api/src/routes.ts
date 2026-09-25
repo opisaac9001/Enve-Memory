@@ -38,6 +38,13 @@ function strList(body: RouteContext['body'], name: string): string[] | undefined
   return value as string[];
 }
 
+function queryOffset(query: URLSearchParams): number {
+  const raw = query.get('offset');
+  const offset = raw === null ? 0 : Number(raw);
+  if (!Number.isInteger(offset) || offset < 0) throw badField('offset', 'a non-negative integer');
+  return offset;
+}
+
 function queryLimit(query: URLSearchParams): number | undefined {
   const raw = query.get('limit');
   return raw === null ? undefined : Number(raw);
@@ -48,6 +55,8 @@ const queryFilter = (query: URLSearchParams) => ({
   type: query.get('type') ?? undefined,
   tag: query.get('tag') ?? undefined,
   includeArchived: query.get('archived') === 'true',
+  inbox: query.get('inbox') === 'true',
+  before: query.get('before') ?? undefined,
 });
 
 const ID = '([^/]+)';
@@ -152,7 +161,10 @@ export const routes: Route[] = [
     method: 'GET', pattern: path('/tasks'), scope: 'read',
     handle: ({ memory, query }) =>
       memory.tasks.list(
-        { project: query.get('project') ?? undefined, status: query.get('status') ?? undefined, tag: query.get('tag') ?? undefined },
+        {
+          project: query.get('project') ?? undefined, status: query.get('status') ?? undefined, tag: query.get('tag') ?? undefined,
+          offset: queryOffset(query),
+        },
         queryLimit(query),
       ),
   },
