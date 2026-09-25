@@ -13,6 +13,7 @@ import { type MemoryPaths, defaultHome, pathsFor } from './paths.ts';
 import { ProjectService } from './projects.ts';
 import { SearchService } from './search.ts';
 import { SettingsService } from './settings.ts';
+import { SyncService } from './sync.ts';
 import { TaskService } from './tasks.ts';
 import { ITEM_TYPES, type ItemType, type ProjectBriefing } from './types.ts';
 
@@ -39,6 +40,7 @@ export class EnveMemory {
   readonly clients: ClientService;
   readonly backups: BackupService;
   readonly exports: ExportService;
+  readonly sync: SyncService;
   readonly files: FileService;
   private readonly db: DatabaseSync;
   private readonly ctx: Context;
@@ -64,6 +66,7 @@ export class EnveMemory {
     this.clients = new ClientService(this.ctx);
     this.backups = new BackupService(this.ctx, paths);
     this.exports = new ExportService(this.ctx, this.items, this.projects, this.decisions);
+    this.sync = new SyncService(this.ctx, this.items, this.settings);
     this.files = new FileService(this.ctx, this.items);
   }
 

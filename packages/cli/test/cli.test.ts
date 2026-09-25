@@ -86,6 +86,17 @@ test('AI is off until a provider is chosen, and misconfiguration is explained', 
   assert.equal(json(home, ['ai', 'off']).provider, 'none');
 });
 
+test('two libraries sync through a shared folder from the command line', () => {
+  const [laptop, desktop, folder] = [tempHome(), tempHome(), tempHome()];
+  const note = json(laptop, ['note', 'written on the laptop']);
+  assert.equal(json(laptop, ['sync', folder]).exported, 1);
+  const received = json(desktop, ['sync', folder]);
+  assert.equal(received.imported, 1);
+  assert.equal(json(desktop, ['show', note.id]).source, 'cli');
+  assert.equal(json(desktop, ['sync', 'off']).syncFolder, null);
+  assert.equal(cli(desktop, ['sync']).code, 1);
+});
+
 test('errors are reported with distinct exit codes', () => {
   const home = tempHome();
   assert.equal(cli(home, ['show', 'nope']).code, 1);

@@ -22,12 +22,28 @@ export class Context {
 
   /** Null for in-memory libraries, which can't hold files. */
   readonly attachmentsDir: string | null;
+  private clock: { at: string; counter: number };
 
   constructor(db: DatabaseSync, actor: string, attachmentsDir: string | null) {
     this.db = db;
     this.actor = actor;
     this.attachmentsDir = attachmentsDir;
     this.deviceId = this.loadDeviceId();
+    const latest = this.get<{ hlc: string | null }>(`SELECT max(hlc) AS hlc FROM changes`)?.hlc;
+    this.clock = latest ? parseHlc(latest) : { at: '', counter: 0 };
+  }
+
+  /** Next hybrid logical clock stamp: never behind any stamp seen before, even if the wall clock is. */
+  tick(): string {
+    const now = this.now();
+    this.clock = now > this.clock.at ? { at: now, counter: 0 } : { at: this.clock.at, counter: this.clock.counter + 1 };
+    return formatHlc(this.clock, this.deviceId);
+  }
+
+  /** Advances the clock past a stamp from another device. */
+  observe(hlc: string): void {
+    const seen = parseHlc(hlc);
+    if (seen.at > this.clock.at || (seen.at === this.clock.at && seen.counter > this.clock.counter)) this.clock = seen;
   }
 
   now(): string {
@@ -59,12 +75,22 @@ export class Context {
     return transaction(this.db, fn);
   }
 
-  record(entity: Change['entity'], entityId: string, op: string, projectId: string | null, data: object | null = null): void {
+  /** `origin` is set only when applying another device's change during sync. */
+  record(
+    entity: Change['entity'], entityId: string, op: string, projectId: string | null, data: object | null = null,
+    origin?: { deviceId: string; actor: string; hlc: string },
+  ): void {
+    const hlc = origin?.hlc ?? this.tick();
     this.run(
-      `INSERT INTO changes (id, device_id, actor, entity, entity_id, op, project_id, data, at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      newId(), this.deviceId, this.actor, entity, entityId, op, projectId,
-      data === null ? null : JSON.stringify(data), this.now(),
+      `INSERT INTO changes (id, device_id, actor, entity, entity_id, op, project_id, data, at, hlc)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      newId(), origin?.deviceId ?? this.deviceId, origin?.actor ?? this.actor, entity, entityId, op, projectId,
+      data === null ? null : JSON.stringify(data), this.now(), hlc,
+    );
+    this.run(
+      `INSERT INTO sync_versions (entity, entity_id, hlc, synced) VALUES (?, ?, ?, ?)
+       ON CONFLICT (entity, entity_id) DO UPDATE SET hlc = excluded.hlc, synced = coalesce(excluded.synced, sync_versions.synced)`,
+      entity, entityId, hlc, origin ? hlc : null,
     );
   }
 
@@ -75,6 +101,15 @@ export class Context {
     this.run(`INSERT INTO settings (key, value) VALUES ('device_id', ?)`, id);
     return id;
   }
+}
+
+export function formatHlc({ at, counter }: { at: string; counter: number }, deviceId: string): string {
+  return `${at}-${String(counter).padStart(4, '0')}-${deviceId}`;
+}
+
+export function parseHlc(hlc: string): { at: string; counter: number } {
+  // ISO timestamp (24 chars), '-', 4-digit counter, '-', device id.
+  return { at: hlc.slice(0, 24), counter: Number(hlc.slice(25, 29)) };
 }
 
 export const ITEM_COLUMNS = `

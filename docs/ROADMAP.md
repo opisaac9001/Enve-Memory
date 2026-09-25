@@ -15,7 +15,7 @@
 | 5a | Backups (hourly/daily/monthly rotation, verified restore with undo, 30-day attachment trash), Export Everything (Markdown + JSON + files) | ✅ 2026-09-24 |
 | 5b | Installers for macOS/Windows/Linux | |
 | 6 | iOS companion: SwiftUI app + share extension, capture and search first | |
-| 7 | Sync (see SYNC.md) | |
+| 7 | Folder sync between computers: per-device append-only segments, hybrid logical clocks, full-state LWW records, conflict notes for concurrent text edits, tombstones, content-addressed blobs (see SYNC.md) | ✅ 2026-09-24 |
 | 8 | Ecosystem: plugins (importers, exporters, extractors, providers, tools), automations, graph view, public sharing through a tunnel/relay, remote access via Tailscale | |
 
 Rules of thumb:

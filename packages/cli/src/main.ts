@@ -73,6 +73,8 @@ Your data
   export <folder>              Write everything as Markdown + JSON (plus original files)
   backup                       Take a snapshot now
   backups                      List snapshots (taken automatically while the app or \`serve\` runs)
+  sync [folder]                Sync through a shared folder (iCloud Drive, Dropbox, Syncthing…); a folder argument sets it
+  sync off                     Stop syncing
   restore <file|latest> --yes  Replace the library with a snapshot; the current state is snapshotted first.
                                Quit the desktop app, \`serve\` and AI clients first.
 
@@ -296,6 +298,17 @@ async function run(memory: EnveMemory): Promise<void> {
       const summary = memory.exports.write(resolve(text(0, 'folder')));
       return emit(summary, `Exported ${summary.items} items, ${summary.projects} projects and ${summary.files} files to ${summary.path}`);
     }
+    case 'sync': {
+      const [target] = rest;
+      if (target === 'off') {
+        memory.settings.set('syncFolder', '');
+        return emit({ syncFolder: null }, 'Sync is off. Nothing was removed from the shared folder.');
+      }
+      if (target) memory.settings.set('syncFolder', resolve(target));
+      const result = memory.sync.run();
+      return emit({ folder: memory.settings.get('syncFolder'), ...result },
+        `Synced with ${result.devices} other device${result.devices === 1 ? '' : 's'} through ${memory.settings.get('syncFolder')}: sent ${result.exported}, received ${result.imported}${result.conflicts ? `, kept ${result.conflicts} conflicting edit${result.conflicts === 1 ? '' : 's'} as notes` : ''}.`);
+    }
     case 'backup': {
       const backup = memory.backups.create('manual');
       return emit(backup, `Snapshot saved: ${backup.path}`);
@@ -445,9 +458,20 @@ async function serve(): Promise<void> {
   };
   backup();
   const backupTimer = setInterval(backup, 10 * 60_000);
+  const sync = () => {
+    if (!memory.settings.get('syncFolder')) return;
+    try {
+      memory.sync.run();
+    } catch (error) {
+      console.error('sync:', (error as Error).message);
+    }
+  };
+  sync();
+  const syncTimer = setInterval(sync, 2 * 60_000);
   console.error(`Enve Memory API listening on ${url}${opts.lan ? ' (also reachable from your network)' : ''}\nREST: ${url}/api/v1   MCP: ${url}/mcp`);
   const stop = async () => {
     clearInterval(backupTimer);
+    clearInterval(syncTimer);
     await api.close();
     await indexer?.idle();
     await enricher.idle();

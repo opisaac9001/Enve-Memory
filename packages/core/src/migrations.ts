@@ -196,4 +196,29 @@ export const MIGRATIONS: readonly Migration[] = [
       END;
     `,
   },
+  {
+    name: 'sync',
+    sql: `
+      -- Hybrid logical clock stamp: ISO time, a counter, and the device, so it sorts correctly across devices.
+      ALTER TABLE changes ADD COLUMN hlc TEXT;
+      UPDATE changes SET hlc = at || '-0000-' || device_id;
+
+      -- The newest version of each entity known here, and the version last exchanged with other devices.
+      CREATE TABLE sync_versions (
+        entity TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        hlc TEXT NOT NULL,
+        synced TEXT,
+        PRIMARY KEY (entity, entity_id)
+      ) STRICT;
+      INSERT INTO sync_versions (entity, entity_id, hlc)
+        SELECT entity, entity_id, max(hlc) FROM changes GROUP BY entity, entity_id;
+
+      -- The last segment applied from each other device.
+      CREATE TABLE sync_cursors (
+        device_id TEXT PRIMARY KEY,
+        segment TEXT NOT NULL
+      ) STRICT;
+    `,
+  },
 ];

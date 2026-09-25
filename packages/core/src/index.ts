@@ -15,6 +15,7 @@ export type { CreateProjectInput, UpdateProjectInput } from './projects.ts';
 export type { RecordDecisionInput } from './decisions.ts';
 export type { Settings } from './settings.ts';
 export { DrainWorker } from './worker.ts';
+export { type SyncRecord, type SyncResult } from './sync.ts';
 export { EXPORT_FORMAT, EXPORT_VERSION, type ExportSummary } from './export.ts';
 export { BACKUP_KINDS, type Backup, type BackupKind, listBackups, restoreBackup, verifyBackup } from './backups.ts';
 export * from './types.ts';
