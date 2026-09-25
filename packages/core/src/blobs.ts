@@ -24,8 +24,12 @@ export const toAttachment = (row: AttachmentRow): Attachment => ({
 });
 
 /** Content-addressed: attachments/ab/abcdef…, so identical files are stored once. */
+export const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+
 export function blobPath(ctx: Context, sha256: string): string {
   if (!ctx.attachmentsDir) throw new MemoryError('invalid', 'Files need an on-disk library.');
+  // The hash becomes a path, and synced rows come from other machines: never let it be anything but a hash.
+  if (!SHA256_PATTERN.test(sha256)) throw new MemoryError('invalid', 'Malformed attachment hash.');
   return join(ctx.attachmentsDir, sha256.slice(0, 2), sha256);
 }
 
@@ -67,6 +71,7 @@ export function reconcileBlobs(attachmentsDir: string, referenced: Set<string>, 
   let restored = 0;
   let purged = 0;
   for (const name of readdirSync(trash)) {
+    if (!SHA256_PATTERN.test(name)) continue;
     const path = join(trash, name);
     if (referenced.has(name)) {
       const target = join(attachmentsDir, name.slice(0, 2), name);

@@ -176,6 +176,9 @@ test('an Idempotency-Key makes retried writes safe', async () => {
   const other = await call('POST', '/api/v1/capture', extension, { selection: 'sent twice by a flaky network' }, headers);
   assert.notEqual(other.data.item.id, first.data.item.id, 'keys are per client');
   assert.equal((await call('POST', '/api/v1/capture', writer, {}, { 'Idempotency-Key': 'x'.repeat(200) })).status, 400);
+  const elsewhere = await call('POST', '/api/v1/items', writer, { type: 'note', body: 'same key, different endpoint' }, headers);
+  assert.equal(elsewhere.headers.get('idempotent-replayed'), null, 'keys are bound to the endpoint');
+  assert.equal(elsewhere.data.body, 'same key, different endpoint');
 });
 
 test('lists page with a before cursor and an offset', async () => {

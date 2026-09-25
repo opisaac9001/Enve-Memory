@@ -249,4 +249,21 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT;
     `,
   },
+  {
+    name: 'sync_hardening',
+    sql: `
+      -- Clock counters widen from 4 to 6 digits so a burst of edits can't overflow and sort out of order.
+      UPDATE changes SET hlc = substr(hlc, 1, 25) || '00' || substr(hlc, 26) WHERE substr(hlc, 30, 1) = '-';
+      UPDATE sync_versions SET hlc = substr(hlc, 1, 25) || '00' || substr(hlc, 26) WHERE substr(hlc, 30, 1) = '-';
+      UPDATE sync_versions SET synced = substr(synced, 1, 25) || '00' || substr(synced, 26) WHERE substr(synced, 30, 1) = '-';
+
+      -- References that arrived before what they point at (an item before its project, a relation before its items).
+      CREATE TABLE sync_pending (
+        kind TEXT NOT NULL,
+        key TEXT NOT NULL,
+        payload TEXT NOT NULL CHECK (json_valid(payload)),
+        PRIMARY KEY (kind, key)
+      ) STRICT;
+    `,
+  },
 ];

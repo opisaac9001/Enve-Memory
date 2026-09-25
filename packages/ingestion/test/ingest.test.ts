@@ -67,6 +67,9 @@ const server = createServer((req, res) => {
     case '/huge':
       res.writeHead(200, { 'Content-Type': 'text/html' });
       return res.end(`<html><body>${'x'.repeat(2048)}</body></html>`);
+    case '/to-metadata':
+      res.writeHead(302, { Location: 'http://169.254.169.254/latest/meta-data' });
+      return res.end();
     case '/slow':
       return setTimeout(() => res.end('late'), 2000);
     default:
@@ -134,6 +137,14 @@ test('failures are recorded on the item instead of thrown', async () => {
   const huge = memory.items.saveLink({ url: `${base}/huge` }).item;
   const slow = memory.items.saveLink({ url: `${base}/slow` }).item;
   const metadataHost = memory.items.saveLink({ url: 'http://169.254.169.254/latest/meta-data' }).item;
+  const sneaky = [
+    memory.items.saveLink({ url: `${base}/to-metadata` }).item,
+    memory.items.saveLink({ url: 'http://[::ffff:169.254.169.254]/latest' }).item,
+    memory.items.saveLink({ url: 'http://metadata.google.internal./computeMetadata/v1' }).item,
+  ];
+  for (const item of sneaky) {
+    assert.match((await ingestItem(memory, item.id)).metadata.ingest!.error!, /not fetchable/, item.url!);
+  }
 
   assert.match((await ingestItem(memory, missing.id)).metadata.ingest!.error!, /answered 404/);
   assert.match((await ingestItem(memory, huge.id, { maxBytes: 1024 })).metadata.ingest!.error!, /too large/);

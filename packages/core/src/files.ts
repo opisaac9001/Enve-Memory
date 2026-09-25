@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { type AttachmentRow, blobPath, toAttachment, writeBlob } from './blobs.ts';
 import { type Context, newId, required } from './context.ts';
@@ -98,6 +98,7 @@ export class FileService {
 
   read(itemId: string): { attachment: Attachment; data: Buffer } {
     const { attachment, path } = this.primary(itemId);
+    if (!existsSync(path)) throw notFound(`The contents of ${attachment.filename} haven't arrived on this device yet.`);
     return { attachment, data: readFileSync(path) };
   }
 }

@@ -1,5 +1,5 @@
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { blobPath } from './blobs.ts';
 import { type Context, slugify } from './context.ts';
 import { invalid } from './errors.ts';
@@ -46,8 +46,9 @@ export class ExportService {
     const items = ids.map((id) => this.items.get(id));
     let files = 0;
 
+    // Slugs and filenames can come from other devices through sync: re-derive them so nothing escapes the export folder.
     const groups: { slug: string; name: string; project: Project | null }[] = [
-      ...projects.map((project) => ({ slug: project.slug, name: project.name, project })),
+      ...projects.map((project) => ({ slug: slugify(project.slug) || 'project', name: project.name, project })),
       { ...INBOX, project: null },
     ];
     for (const group of groups) {
@@ -84,7 +85,7 @@ export class ExportService {
         for (const attachment of item.attachments) {
           const source = blobPath(this.ctx, attachment.sha256);
           if (!existsSync(source)) continue;
-          const target = uniqueName(join(dir, 'files'), attachment.filename, names);
+          const target = uniqueName(join(dir, 'files'), basename(attachment.filename) || 'file', names);
           mkdirSync(join(dir, 'files'), { recursive: true });
           copyFileSync(source, target);
           files++;

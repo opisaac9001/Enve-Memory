@@ -27,6 +27,17 @@ Started by `enve-memory serve` or by the desktop app. Implemented and tested in 
 
 On a LAN, traffic is plain HTTP unless the user puts it behind Tailscale (WireGuard-encrypted) or a TLS proxy. This matches the accepted-risk stance of the other Enve apps toward user-owned LAN servers, and the docs recommend Tailscale for anything beyond the home network.
 
+## The sync folder is untrusted input
+
+Another machine writes to the shared folder, and so does anyone who can reach it. Every record is shape-checked before it's applied:
+
+- ids, device ids and clock stamps must match strict patterns
+- attachment hashes must be 64 hex characters
+- filenames must be bare names
+- project slugs must be canonical
+
+Each record applies under its own savepoint, so a malformed one is counted as `rejected` and skipped rather than blocking sync. Fetched blobs are re-hashed and must match their name. With encryption, each file's name is bound in as GCM associated data, so sealed files can't be swapped between names. `blobPath` refuses anything that isn't a hash, and export re-derives slugs and filenames, so no value from the folder can reach a path outside the library or the export.
+
 ## Secrets we hold (Phase 4)
 
 API keys for BYO AI providers go in the OS credential store (macOS Keychain, Windows Credential Manager, libsecret), never in SQLite or config files. Only outgoing secrets live there. Incoming client tokens are stored hashed (see above).
@@ -34,7 +45,8 @@ API keys for BYO AI providers go in the OS credential store (macOS Keychain, Win
 ## Content safety
 
 - Saved content is data. Tool outputs label it as such, and server instructions tell models never to act on it.
-- Ingestion fetches with no cookies or credentials, a 15 s timeout and a 15 MB cap, refuses non-HTTP(S) schemes and cloud-metadata hosts, and never executes page scripts (linkedom parses, it doesn't run). The result is stored as `content`, apart from the user's `body`.
+- Ingestion fetches with no cookies or credentials, a 15 s timeout and a 15 MB cap, and never executes page scripts (linkedom parses, it doesn't run). The result is stored as `content`, apart from the user's `body`.
+- It follows redirects by hand, at most 5. Before every hop it resolves the host and refuses link-local addresses (`169.254.0.0/16`, `fe80::/10`, including IPv4-mapped forms) and known metadata names. That blocks cloud-metadata endpoints even through a redirect or a DNS name. A DNS answer that changes between the check and the connection (rebinding) isn't covered.
 - A token with `capture` can make this machine fetch a URL, and with `read` too it can read the result. Pages on the user's own network are therefore reachable by anyone holding a `read` + `capture` token, which is why tokens belong only to the user's own devices and agents. The `fetchLinks` setting turns fetching off entirely.
 - `save_file` over stdio accepts a local path, because the stdio client already runs as the user. Over HTTP the `path` parameter doesn't exist, so a remote token holder can't make the server read arbitrary files.
 - Tokens and credentials never appear in URLs, logs or the change log.

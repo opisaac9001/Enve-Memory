@@ -36,13 +36,19 @@ export class Context {
   /** Next hybrid logical clock stamp: never behind any stamp seen before, even if the wall clock is. */
   tick(): string {
     const now = this.now();
-    this.clock = now > this.clock.at ? { at: now, counter: 0 } : { at: this.clock.at, counter: this.clock.counter + 1 };
+    if (now > this.clock.at) this.clock = { at: now, counter: 0 };
+    else if (this.clock.counter < MAX_COUNTER) this.clock = { at: this.clock.at, counter: this.clock.counter + 1 };
+    else this.clock = { at: new Date(Date.parse(this.clock.at) + 1).toISOString(), counter: 0 };
     return formatHlc(this.clock, this.deviceId);
   }
 
-  /** Advances the clock past a stamp from another device. */
+  /**
+   * Advances the clock past a stamp from another device. A stamp far in the future (a peer with a badly wrong clock)
+   * is not followed, or it would drag every device's clock along with it.
+   */
   observe(hlc: string): void {
     const seen = parseHlc(hlc);
+    if (Date.parse(seen.at) - Date.now() > MAX_CLOCK_LEAD_MS) return;
     if (seen.at > this.clock.at || (seen.at === this.clock.at && seen.counter > this.clock.counter)) this.clock = seen;
   }
 
@@ -103,13 +109,20 @@ export class Context {
   }
 }
 
+const MAX_COUNTER = 999_999;
+const MAX_CLOCK_LEAD_MS = 5 * 60_000;
+
+/** ISO time, a 6-digit counter and the device: fixed width up to the device, so plain string order is clock order. */
+export const HLC_PATTERN = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)-(\d{6})-([\w-]{1,64})$/;
+
 export function formatHlc({ at, counter }: { at: string; counter: number }, deviceId: string): string {
-  return `${at}-${String(counter).padStart(4, '0')}-${deviceId}`;
+  return `${at}-${String(counter).padStart(6, '0')}-${deviceId}`;
 }
 
 export function parseHlc(hlc: string): { at: string; counter: number } {
-  // ISO timestamp (24 chars), '-', 4-digit counter, '-', device id.
-  return { at: hlc.slice(0, 24), counter: Number(hlc.slice(25, 29)) };
+  const match = HLC_PATTERN.exec(hlc);
+  if (!match) throw invalid(`Malformed clock stamp "${hlc.slice(0, 80)}".`);
+  return { at: match[1]!, counter: Number(match[2]) };
 }
 
 export const ITEM_COLUMNS = `

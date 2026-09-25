@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { EnveMemory } from '@enve-memory/core';
+import { EnveMemory, pathsFor, restoreBackup } from '@enve-memory/core';
 
 const temp = (label: string) => mkdtempSync(join(tmpdir(), `enve-memory-sync-${label}-`));
 
@@ -136,8 +136,8 @@ test('re-running is idempotent and partially written segments are retried later'
   a.items.saveNote({ body: 'one' });
   syncAll();
   const before = snapshot(b);
-  assert.deepEqual(b.sync.run(), { exported: 0, imported: 0, conflicts: 0, devices: 1 });
-  assert.deepEqual(a.sync.run(), { exported: 0, imported: 0, conflicts: 0, devices: 1 });
+  assert.deepEqual(b.sync.run(), { exported: 0, imported: 0, conflicts: 0, rejected: 0, devices: 1 });
+  assert.deepEqual(a.sync.run(), { exported: 0, imported: 0, conflicts: 0, rejected: 0, devices: 1 });
   assert.deepEqual(snapshot(b), before);
 
   const aDir = join(folder, 'devices', a.deviceId);
@@ -203,4 +203,97 @@ test('an encrypted sync folder holds no readable data and needs the passphrase',
   c.sync.run(plainFolder);
   assert.throws(() => c.sync.setPassphrase('correct horse battery', plainFolder), /already holds unencrypted/);
   assert.throws(() => c.sync.setPassphrase('short', temp('empty')), /at least 8/);
+});
+
+const segmentLines = (folder: string, deviceId: string) => readdirSync(join(folder, 'devices', deviceId))
+  .filter((f) => f.endsWith('.ndjson')).sort()
+  .flatMap((f) => readFileSync(join(folder, 'devices', deviceId, f), 'utf8').split('\n').filter(Boolean));
+
+function writeSegment(folder: string, deviceId: string, name: string, records: unknown[]): void {
+  writeFileSync(join(folder, 'devices', deviceId, name), `${records.map((r) => JSON.stringify(r)).join('\n')}\n`);
+}
+
+test('a device reading several peers keeps project assignments and relations that arrive out of order', () => {
+  const { folder, libraries: [a, b] } = devices();
+  a.projects.create({ name: 'Garage' });
+  const x = a.items.saveNote({ body: 'x', project: 'garage' });
+  a.sync.run();
+  b.sync.run();
+  const y = b.items.saveNote({ body: 'y', project: 'garage' });
+  b.items.relate(y.id, x.id, 'references');
+  b.sync.run();
+
+  // A late joiner whose segments from B happen to be read before A's.
+  const c = EnveMemory.open({ home: temp('late-order'), actor: 'c' });
+  c.sync.run(folder);
+  assert.equal(c.items.get(y.id).project?.name, 'Garage');
+  assert.deepEqual(c.items.get(y.id).relations.map((r) => r.id), [x.id]);
+});
+
+test('records that could escape the library or break sync are rejected without blocking the rest', () => {
+  const { folder, libraries: [a, b] } = devices();
+  const good = a.items.saveNote({ body: 'good record' });
+  a.sync.run();
+  const [line] = segmentLines(folder, a.deviceId).filter((l) => l.includes(good.id));
+  const valid = JSON.parse(line!);
+  const outside = join(folder, '..', 'escaped.txt');
+  const stamp = (n: number) => valid.hlc.replace(/-\d{6}-/, `-${String(n).padStart(6, '0')}-`);
+  const evil = [
+    { ...valid, id: 'evil-hash', hlc: stamp(1), state: { ...valid.state, item: { ...valid.state.item, id: 'evil-hash' }, attachments: [{ id: 'a1', sha256: '../../escaped', filename: 'x', mime_type: 'text/plain', size: 1, created_at: valid.hlc.slice(0, 24) }] } },
+    { ...valid, id: 'evil-name', hlc: stamp(2), state: { ...valid.state, item: { ...valid.state.item, id: 'evil-name' }, attachments: [{ id: 'a2', sha256: 'a'.repeat(64), filename: '../../escaped.txt', mime_type: 'text/plain', size: 1, created_at: valid.hlc.slice(0, 24) }] } },
+    { ...valid, id: 'evil-type', hlc: stamp(3), state: { ...valid.state, item: { ...valid.state.item, id: 'evil-type', title: { not: 'a string' } } } },
+    { ...valid, id: 'evil-slug', entity: 'project', hlc: stamp(4), state: { id: 'evil-slug', name: 'x', slug: '../../x' } },
+    { ...valid, hlc: 'not-a-clock' },
+  ];
+  writeSegment(folder, a.deviceId, '000000009999.ndjson', evil);
+  const other = a.items.saveNote({ body: 'written after the bad segment' });
+  a.sync.run();
+
+  const result = b.sync.run();
+  assert.equal(result.rejected, 5);
+  assert.equal(b.items.get(good.id).body, 'good record');
+  assert.equal(b.items.get(other.id).body, 'written after the bad segment', 'sync carried on past the bad records');
+  assert.equal(existsSync(outside), false);
+  assert.throws(() => b.items.get('evil-type'), /No item/);
+});
+
+test('after a backup restore, new edits still reach other devices', () => {
+  const { libraries: [a, b], syncAll } = devices();
+  a.items.saveNote({ body: 'before' });
+  const snapshot = a.backups.create('manual');
+  for (let i = 0; i < 5; i++) a.items.saveNote({ body: `later ${i}` });
+  syncAll();
+  const home = a.paths!.home;
+  a.close();
+  restoreBackup(pathsFor(home), snapshot.path);
+  const restored = EnveMemory.open({ home, actor: 'restored' });
+  const fresh = restored.items.saveNote({ body: 'after the restore' });
+  restored.sync.run();
+  b.sync.run();
+  assert.equal(b.items.get(fresh.id).body, 'after the restore');
+});
+
+test('a corrupt blob in the folder is never installed as the attachment', () => {
+  const { folder, libraries: [a, b] } = devices();
+  const file = a.files.save({ data: new TextEncoder().encode('the real bytes'), filename: 'real.txt' }).item;
+  a.sync.run();
+  const blob = join(folder, 'blobs', file.attachments[0]!.sha256);
+  writeFileSync(blob, 'truncated');
+  b.sync.run();
+  assert.throws(() => b.files.read(file.id));
+  writeFileSync(blob, 'the real bytes');
+  b.sync.run();
+  assert.equal(b.files.read(file.id).data.toString(), 'the real bytes');
+});
+
+test('a renamed duplicate project keeps its name through later updates', () => {
+  const { libraries: [a, b], syncAll } = devices();
+  a.projects.create({ name: 'Garage' });
+  b.projects.create({ name: 'Garage' });
+  syncAll();
+  for (let i = 0; i < 3; i++) {
+    b.projects.update('garage', { description: `edit ${i}` });
+    syncAll();
+  }
+  assert.deepEqual(a.projects.list().map((p) => p.name).sort(), ['Garage', 'Garage (2)']);
 });

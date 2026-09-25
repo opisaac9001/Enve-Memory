@@ -42,7 +42,11 @@ A record also carries `base`: the version the writing device had last exchanged 
 - **Deletes** are tombstones: a newer delete removes the item everywhere, and a newer edit beats an older delete.
 - **Same-named projects** created on two devices before their first sync are both kept (one becomes "Garage (2)"). Nothing is merged blindly.
 - Applied changes go into the change log attributed to the remote device and actor, so Activity shows what came from where, and they're never echoed back.
-- Attachment bytes travel through `blobs/`. A row that arrives before its bytes gets them on a later run.
+- Attachment bytes travel through `blobs/`. A row that arrives before its bytes gets them on a later run, and bytes are re-hashed before they're installed.
+- Every pending segment from every device is read first, then applied in one global order, so a peer's folder being read first can't strand an item without its project. References that still arrive before their target (an item whose project hasn't synced yet, a relation between items not yet here) wait in `sync_pending` and are linked once the target lands.
+- Clock stamps use a 6-digit counter that rolls into the next millisecond on overflow. Stamps more than 5 minutes ahead of this machine's clock are applied but never followed, so one peer with a wrong clock can't drag every device forward.
+- Segment names only grow, even after a backup restore rolls the change sequence back.
+- See SECURITY.md for how records from the folder are validated.
 
 ## Encryption
 

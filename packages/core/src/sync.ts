@@ -1,14 +1,14 @@
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { SQLInputValue } from 'node:sqlite';
-import { blobPath, removeBlobIfUnused } from './blobs.ts';
-import { type Context, newId } from './context.ts';
+import { SHA256_PATTERN, blobPath, removeBlobIfUnused } from './blobs.ts';
+import { type Context, HLC_PATTERN, newId, normalizeTag, slugify } from './context.ts';
 import { invalid } from './errors.ts';
 import type { ItemService } from './items.ts';
 import type { SettingsService } from './settings.ts';
-import type { Change } from './types.ts';
+import { type Change, ITEM_TYPES, RELATION_KINDS } from './types.ts';
 
 type Entity = Change['entity'];
 
@@ -35,6 +35,8 @@ export interface SyncResult {
   exported: number;
   imported: number;
   conflicts: number;
+  /** Records from other devices that were malformed or failed to apply, and were skipped. */
+  rejected: number;
   devices: number;
 }
 
@@ -42,6 +44,8 @@ const ITEM_FIELDS = ['id', 'type', 'title', 'body', 'url', 'content', 'metadata'
 const PROJECT_FIELDS = ['id', 'name', 'slug', 'description', 'instructions', 'memory', 'status', 'created_at', 'updated_at'];
 const APPLY_ORDER: Record<Entity, number> = { project: 0, item: 1, relation: 2 };
 const EXPORTED_SEQ = 'sync.exported_seq';
+const SEGMENT = /^\d{12}\.ndjson$/;
+const DEVICE_ID = /^[\w-]{1,64}$/;
 const KEY_SETTING = 'sync.key';
 const MARKER = 'sync.json';
 const VERIFIER = 'enve-memory sync key check';
@@ -61,15 +65,18 @@ class Sealer {
     this.key = key;
   }
 
-  seal(plain: Buffer): Buffer {
+  /** `name` is bound in as associated data, so sealed files can't be swapped between names undetected. */
+  seal(plain: Buffer, name: string): Buffer {
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', this.key, iv);
+    cipher.setAAD(Buffer.from(name));
     const body = Buffer.concat([cipher.update(plain), cipher.final()]);
     return Buffer.concat([iv, cipher.getAuthTag(), body]);
   }
 
-  open(sealed: Buffer): Buffer {
+  open(sealed: Buffer, name: string): Buffer {
     const decipher = createDecipheriv('aes-256-gcm', this.key, sealed.subarray(0, 12));
+    decipher.setAAD(Buffer.from(name));
     decipher.setAuthTag(sealed.subarray(12, 28));
     return Buffer.concat([decipher.update(sealed.subarray(28)), decipher.final()]);
   }
@@ -111,7 +118,7 @@ export class SyncService {
     if (marker?.encryption) {
       key = deriveKey(passphrase, Buffer.from(marker.encryption.salt, 'base64'));
       try {
-        if (new Sealer(key).open(Buffer.from(marker.encryption.verifier, 'base64')).toString() !== VERIFIER) throw new Error();
+        if (new Sealer(key).open(Buffer.from(marker.encryption.verifier, 'base64'), MARKER).toString() !== VERIFIER) throw new Error();
       } catch {
         throw invalid('That passphrase does not match the one this sync folder was set up with.');
       }
@@ -119,7 +126,7 @@ export class SyncService {
       mkdirSync(folder, { recursive: true });
       const salt = randomBytes(16);
       key = deriveKey(passphrase, salt);
-      const verifier = new Sealer(key).seal(Buffer.from(VERIFIER)).toString('base64');
+      const verifier = new Sealer(key).seal(Buffer.from(VERIFIER), MARKER).toString('base64');
       writeMarker(folder, { version: 1, encryption: { kdf: 'scrypt', salt: salt.toString('base64'), verifier } });
     }
     this.ctx.run(
@@ -160,11 +167,11 @@ export class SyncService {
     mkdirSync(join(folder, 'blobs'), { recursive: true });
     writeFileSync(join(dir, 'device.json'), JSON.stringify({ deviceId: this.ctx.deviceId, name: hostname(), lastSync: this.ctx.now() }));
     let exported = this.export(folder);
-    const { imported, conflicts, devices } = this.import(folder);
+    const { imported, conflicts, rejected, devices } = this.import(folder);
     // Conflict notes made while importing go out now rather than on the next run.
     exported += this.export(folder);
     this.fetchMissingBlobs(folder);
-    return { exported, imported, conflicts, devices };
+    return { exported, imported, conflicts, rejected, devices };
   }
 
   private export(folder: string): number {
@@ -185,9 +192,12 @@ export class SyncService {
     });
     const lastSeq = Math.max(...changed.map((c) => c.seq));
     const dir = join(folder, 'devices', this.ctx.deviceId);
-    const name = `${String(lastSeq).padStart(12, '0')}.ndjson`;
+    // Names must only ever grow: after a backup restore the change sequence restarts lower, and peers only read
+    // names past their cursor, so continue from the highest segment already in the folder.
+    const highest = Math.max(0, ...readdirSync(dir).filter((f) => SEGMENT.test(f)).map((f) => Number(f.slice(0, 12))));
+    const name = `${String(Math.max(lastSeq, highest + 1)).padStart(12, '0')}.ndjson`;
     // Write then rename, so a reader never sees half a segment from this device.
-    writeFileSync(join(dir, `.${name}.tmp`), this.pack(Buffer.from(`${records.map((r) => JSON.stringify(r)).join('\n')}\n`)));
+    writeFileSync(join(dir, `.${name}.tmp`), this.pack(Buffer.from(`${records.map((r) => JSON.stringify(r)).join('\n')}\n`), `${this.ctx.deviceId}/${name}`));
     renameSync(join(dir, `.${name}.tmp`), join(dir, name));
     this.ctx.tx(() => {
       for (const r of records) {
@@ -201,37 +211,90 @@ export class SyncService {
     return records.length;
   }
 
-  private import(folder: string): { imported: number; conflicts: number; devices: number } {
+  /**
+   * Reads every pending segment from every device, then applies them in one global order (projects, items, relations;
+   * then clock order), so an item never lands before its project just because its device folder was read first.
+   * Each record applies under its own savepoint: a malformed or failing record is skipped, never a blocker.
+   */
+  private import(folder: string): { imported: number; conflicts: number; rejected: number; devices: number } {
     const devicesDir = join(folder, 'devices');
-    const others = readdirSync(devicesDir).filter((d) => d !== this.ctx.deviceId && existsSync(join(devicesDir, d, 'device.json')));
-    let imported = 0;
-    let conflicts = 0;
+    const others = readdirSync(devicesDir).filter((d) => d !== this.ctx.deviceId && DEVICE_ID.test(d) && existsSync(join(devicesDir, d, 'device.json')));
+    const records: SyncRecord[] = [];
+    const cursors = new Map<string, string>();
+    let rejected = 0;
     for (const device of others) {
       const cursor = this.ctx.get<{ segment: string }>(`SELECT segment FROM sync_cursors WHERE device_id = ?`, device)?.segment ?? '';
-      const segments = readdirSync(join(devicesDir, device)).filter((f) => /^\d{12}\.ndjson$/.test(f) && f > cursor).sort();
+      const segments = readdirSync(join(devicesDir, device)).filter((f) => SEGMENT.test(f) && f > cursor).sort();
       for (const segment of segments) {
-        let records: SyncRecord[];
+        let lines: unknown[];
         try {
-          records = this.unpack(readFileSync(join(devicesDir, device, segment))).toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as SyncRecord);
+          lines = this.unpack(readFileSync(join(devicesDir, device, segment)), `${device}/${segment}`)
+            .toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as unknown);
         } catch {
           // A cloud folder can deliver a file before it's complete; try again next run.
           break;
         }
-        records.sort((a, b) => APPLY_ORDER[a.entity] - APPLY_ORDER[b.entity] || a.hlc.localeCompare(b.hlc));
-        this.ctx.tx(() => {
-          for (const record of records) {
-            const outcome = this.apply(record);
-            if (outcome !== 'skipped') imported++;
-            if (outcome === 'conflict') conflicts++;
-          }
-          this.ctx.run(
-            `INSERT INTO sync_cursors (device_id, segment) VALUES (?, ?) ON CONFLICT (device_id) DO UPDATE SET segment = excluded.segment`,
-            device, segment,
-          );
-        });
+        for (const line of lines) {
+          if (isRecord(line) && line.device === device) records.push(line);
+          else rejected++;
+        }
+        cursors.set(device, segment);
       }
     }
-    return { imported, conflicts, devices: others.length };
+    records.sort((a, b) => APPLY_ORDER[a.entity] - APPLY_ORDER[b.entity] || (a.hlc < b.hlc ? -1 : a.hlc > b.hlc ? 1 : 0));
+
+    let imported = 0;
+    let conflicts = 0;
+    this.ctx.tx(() => {
+      for (const record of records) {
+        this.ctx.db.exec('SAVEPOINT sync_record');
+        try {
+          const outcome = this.apply(record);
+          this.ctx.db.exec('RELEASE sync_record');
+          if (outcome !== 'skipped') imported++;
+          if (outcome === 'conflict') conflicts++;
+        } catch {
+          this.ctx.db.exec('ROLLBACK TO sync_record');
+          this.ctx.db.exec('RELEASE sync_record');
+          rejected++;
+        }
+      }
+      this.resolvePending();
+      for (const [device, segment] of cursors) {
+        this.ctx.run(
+          `INSERT INTO sync_cursors (device_id, segment) VALUES (?, ?) ON CONFLICT (device_id) DO UPDATE SET segment = excluded.segment`,
+          device, segment,
+        );
+      }
+    });
+    return { imported, conflicts, rejected, devices: others.length };
+  }
+
+  /** Links references whose targets have since arrived. */
+  private resolvePending(): void {
+    for (const pending of this.ctx.all<{ kind: string; key: string; payload: string }>(`SELECT * FROM sync_pending`)) {
+      const payload = JSON.parse(pending.payload) as Record<string, string>;
+      if (pending.kind === 'item_project') {
+        const item = this.ctx.get<{ project_id: string | null }>(`SELECT project_id FROM items WHERE id = ?`, pending.key);
+        const current = this.ctx.get<{ hlc: string }>(`SELECT hlc FROM sync_versions WHERE entity = 'item' AND entity_id = ?`, pending.key)?.hlc;
+        if (!item || current !== payload.hlc || item.project_id !== null) {
+          this.ctx.run(`DELETE FROM sync_pending WHERE kind = ? AND key = ?`, pending.kind, pending.key);
+        } else if (this.ctx.get(`SELECT 1 FROM projects WHERE id = ?`, payload.projectId!)) {
+          this.ctx.run(`UPDATE items SET project_id = ? WHERE id = ?`, payload.projectId!, pending.key);
+          this.ctx.run(`DELETE FROM sync_pending WHERE kind = ? AND key = ?`, pending.kind, pending.key);
+        }
+      } else if (pending.kind === 'relation' && this.bothItemsExist(payload.from_id!, payload.to_id!)) {
+        this.insertRelation(payload);
+        this.ctx.run(`DELETE FROM sync_pending WHERE kind = ? AND key = ?`, pending.kind, pending.key);
+      }
+    }
+  }
+
+  private defer(kind: string, key: string, payload: object): void {
+    this.ctx.run(
+      `INSERT INTO sync_pending (kind, key, payload) VALUES (?, ?, ?) ON CONFLICT (kind, key) DO UPDATE SET payload = excluded.payload`,
+      kind, key, JSON.stringify(payload),
+    );
   }
 
   private apply(record: SyncRecord): 'applied' | 'conflict' | 'skipped' {
@@ -243,7 +306,7 @@ export class SyncService {
     const preserved = concurrent ? this.preserveLosingText(record) : false;
 
     const origin = { deviceId: record.device, actor: record.actor, hlc: record.hlc };
-    if (record.entity === 'item') this.applyItem(record.id, record.state as ItemState | null);
+    if (record.entity === 'item') this.applyItem(record.id, record.state as ItemState | null, record.hlc);
     else if (record.entity === 'project') this.applyProject(record.state as Record<string, SQLInputValue> | null);
     else this.applyRelation(record.state as Record<string, SQLInputValue> | null);
     const projectId = record.entity === 'item' ? ((record.state as ItemState | null)?.item.project_id as string | null) ?? null
@@ -300,7 +363,7 @@ export class SyncService {
     };
   }
 
-  private applyItem(id: string, state: ItemState | null): void {
+  private applyItem(id: string, state: ItemState | null, hlc: string): void {
     if (!state) {
       const blobs = this.ctx.all<{ sha256: string }>(`SELECT sha256 FROM attachments WHERE item_id = ?`, id);
       this.ctx.run(`DELETE FROM items WHERE id = ?`, id);
@@ -308,7 +371,10 @@ export class SyncService {
       return;
     }
     const item = { ...state.item };
-    if (item.project_id && !this.ctx.get(`SELECT 1 FROM projects WHERE id = ?`, item.project_id)) item.project_id = null;
+    if (item.project_id && !this.ctx.get(`SELECT 1 FROM projects WHERE id = ?`, item.project_id)) {
+      this.defer('item_project', id, { projectId: item.project_id, hlc });
+      item.project_id = null;
+    }
     this.upsert('items', ITEM_FIELDS, item);
     if (state.task) {
       this.ctx.run(
@@ -341,7 +407,7 @@ export class SyncService {
     const clash = this.ctx.get<{ id: string }>(`SELECT id FROM projects WHERE slug = ? AND id != ?`, project.slug!, project.id!);
     if (clash) {
       let n = 2;
-      while (this.ctx.get(`SELECT 1 FROM projects WHERE slug = ?`, `${project.slug}-${n}`)) n++;
+      while (this.ctx.get(`SELECT 1 FROM projects WHERE slug = ? AND id != ?`, `${project.slug}-${n}`, project.id!)) n++;
       project.slug = `${project.slug}-${n}`;
       project.name = `${project.name} (${n})`;
     }
@@ -350,8 +416,15 @@ export class SyncService {
 
   private applyRelation(state: Record<string, SQLInputValue> | null): void {
     if (!state) return;
-    const bothExist = this.ctx.get(`SELECT count(*) AS n FROM items WHERE id IN (?, ?)`, state.from_id!, state.to_id!) as { n: number };
-    if (bothExist.n < 2) return;
+    if (this.bothItemsExist(state.from_id as string, state.to_id as string)) this.insertRelation(state);
+    else this.defer('relation', state.id as string, state);
+  }
+
+  private bothItemsExist(from: string, to: string): boolean {
+    return (this.ctx.get<{ n: number }>(`SELECT count(*) AS n FROM items WHERE id IN (?, ?)`, from, to)!).n === 2;
+  }
+
+  private insertRelation(state: Record<string, SQLInputValue>): void {
     this.ctx.run(
       `INSERT INTO relations (id, from_id, to_id, kind, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`,
       state.id!, state.from_id!, state.to_id!, state.kind!, state.created_at!,
@@ -366,12 +439,12 @@ export class SyncService {
     );
   }
 
-  private pack(plain: Buffer): Buffer {
-    return this.sealer ? this.sealer.seal(plain) : plain;
+  private pack(plain: Buffer, name: string): Buffer {
+    return this.sealer ? this.sealer.seal(plain, name) : plain;
   }
 
-  private unpack(stored: Buffer): Buffer {
-    return this.sealer ? this.sealer.open(stored) : stored;
+  private unpack(stored: Buffer, name: string): Buffer {
+    return this.sealer ? this.sealer.open(stored, name) : stored;
   }
 
   private exportBlobs(folder: string, state: ItemState): void {
@@ -379,7 +452,7 @@ export class SyncService {
       const target = join(folder, 'blobs', attachment.sha256 as string);
       const source = blobPath(this.ctx, attachment.sha256 as string);
       if (!existsSync(target) && existsSync(source)) {
-        writeFileSync(`${target}.tmp`, this.pack(readFileSync(source)));
+        writeFileSync(`${target}.tmp`, this.pack(readFileSync(source), `blobs/${attachment.sha256 as string}`));
         renameSync(`${target}.tmp`, target);
       }
     }
@@ -393,10 +466,12 @@ export class SyncService {
       if (existsSync(local) || !existsSync(remote)) continue;
       let bytes: Buffer;
       try {
-        bytes = this.unpack(readFileSync(remote));
+        bytes = this.unpack(readFileSync(remote), `blobs/${sha256}`);
       } catch {
         continue;
       }
+      // A partly downloaded or tampered file must not become the attachment; try again next run.
+      if (createHash('sha256').update(bytes).digest('hex') !== sha256) continue;
       mkdirSync(join(local, '..'), { recursive: true });
       writeFileSync(`${local}.tmp`, bytes);
       renameSync(`${local}.tmp`, local);
@@ -412,4 +487,44 @@ function readMarker(folder: string): Marker | null {
 function writeMarker(folder: string, marker: Marker): void {
   writeFileSync(join(folder, `.${MARKER}.tmp`), JSON.stringify(marker, null, 2));
   renameSync(join(folder, `.${MARKER}.tmp`), join(folder, MARKER));
+}
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+const isId = (value: unknown): value is string => isString(value) && DEVICE_ID.test(value);
+
+/**
+ * Shape checks for records read from a folder another machine writes. Column types are enforced by the STRICT
+ * tables; these guard what the tables can't: anything used to build a path, and values the app relies on.
+ */
+function isRecord(value: unknown): value is SyncRecord {
+  if (!value || typeof value !== 'object') return false;
+  const r = value as Record<string, unknown>;
+  if (r.entity !== 'item' && r.entity !== 'project' && r.entity !== 'relation') return false;
+  if (!isId(r.id) || !isId(r.device) || !isString(r.actor)) return false;
+  if (!isString(r.hlc) || !HLC_PATTERN.test(r.hlc)) return false;
+  if (r.base !== null && !(isString(r.base) && HLC_PATTERN.test(r.base))) return false;
+  if (r.state === null) return true;
+  if (!r.state || typeof r.state !== 'object') return false;
+  const state = r.state as Record<string, unknown>;
+  if (r.entity === 'project') {
+    return state.id === r.id && isString(state.name) && isString(state.slug) && state.slug !== '' && slugify(state.slug) === state.slug;
+  }
+  if (r.entity === 'relation') {
+    return state.id === r.id && isId(state.from_id) && isId(state.to_id) && (RELATION_KINDS as readonly unknown[]).includes(state.kind);
+  }
+  const item = state.item as Record<string, unknown> | undefined;
+  if (!item || item.id !== r.id || !(ITEM_TYPES as readonly unknown[]).includes(item.type)) return false;
+  if (item.project_id != null && !isId(item.project_id)) return false;
+  if (!Array.isArray(state.tags) || !state.tags.every((t) => isString(t) && safeTag(t) === t)) return false;
+  return Array.isArray(state.attachments) && state.attachments.every((a: Record<string, unknown>) =>
+    isId(a.id) && isString(a.sha256) && SHA256_PATTERN.test(a.sha256)
+    && isString(a.filename) && a.filename !== '' && basename(a.filename) === a.filename && a.filename !== '..' && !a.filename.includes('\\'));
+}
+
+function safeTag(tag: string): string | null {
+  try {
+    return normalizeTag(tag);
+  } catch {
+    return null;
+  }
 }

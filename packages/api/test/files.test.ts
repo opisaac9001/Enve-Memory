@@ -72,3 +72,14 @@ test('captured links are fetched in the background after the response', async ()
   assert.equal(done.metadata.ingest?.status, 'done');
   assert.match(done.content, /optocoupler/);
 });
+
+test('a file whose bytes have not arrived yet is a 404, not a crash', async () => {
+  const saved = memory.files.save({ data: new TextEncoder().encode('bytes'), filename: 'gone.txt' }).item;
+  const { rmSync } = await import('node:fs');
+  rmSync(memory.files.primary(saved.id).path);
+  const response = await fetch(`${base}/api/v1/items/${saved.id}/file`, { headers: { Authorization: `Bearer ${reader}` } });
+  assert.equal(response.status, 404);
+  const alive = await fetch(`${base}/api/v1/status`);
+  assert.equal(alive.status, 200);
+  assert.equal((await fetch(`${base}/api/v1/items/%E0%A4%A/file`, { headers: { Authorization: `Bearer ${reader}` } })).status, 400);
+});

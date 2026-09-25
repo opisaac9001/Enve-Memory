@@ -1,4 +1,5 @@
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
+import { pipeline } from 'node:stream';
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { type ApiClient, type ClientScope, DrainWorker, type EnveMemory, MemoryError } from '@enve-memory/core';
@@ -35,6 +36,7 @@ export interface ApiServer {
 const STATUS_FOR: Record<MemoryError['code'], number> = { not_found: 404, invalid: 400, conflict: 409, schema: 500 };
 
 export function createApiServer(memory: EnveMemory, options: ApiServerOptions): ApiServer {
+  const inFlight = new Set<string>();
   const ingest = new DrainWorker('ingest', () => processPending(memory), options.afterWrite);
   const changed = () => {
     ingest.kick();
@@ -79,9 +81,17 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
         return await mcpNode(req, res);
       }
 
-      const idempotencyKey = req.method === 'GET' || req.method === 'HEAD' ? undefined : idempotencyKeyOf(req);
+      const rawKey = req.method === 'GET' || req.method === 'HEAD' ? undefined : idempotencyKeyOf(req);
+      // Bound to the method and path, so one key can't replay a different endpoint's answer.
+      const idempotencyKey = rawKey && `${req.method} ${url.pathname} ${rawKey}`;
       // A client retrying after a lost response gets the original answer instead of a second copy.
       const replay = idempotencyKey ? memory.clients.recall(client.id, idempotencyKey) : null;
+      const inFlightKey = idempotencyKey && `${client.id} ${idempotencyKey}`;
+      if (inFlightKey && !replay) {
+        if (inFlight.has(inFlightKey)) throw new HttpError(409, 'in_progress', 'A request with this Idempotency-Key is still being processed.');
+        inFlight.add(inFlightKey);
+        res.once('close', () => inFlight.delete(inFlightKey));
+      }
       const respond = (status: number, result: unknown) => {
         if (idempotencyKey && status < 300) memory.clients.remember(client.id, idempotencyKey, status, JSON.stringify(result));
         send(res, status, result);
@@ -90,9 +100,11 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
       if (url.pathname === '/api/v1/files' && req.method === 'POST') {
         requireScope(client, 'capture');
         if (replay) return replayResponse(res, replay);
+        const data = await readBody(req, MAX_FILE_BODY);
+        // Set right before the synchronous write: another request may have run while the body streamed in.
         memory.actor = `api:${client.name}`;
         const result = memory.files.save({
-          data: await readBody(req, MAX_FILE_BODY),
+          data,
           filename: header(req, 'x-filename') ?? '',
           mimeType: req.headers['content-type'],
           title: header(req, 'x-title'),
@@ -106,7 +118,9 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
       const download = /^\/api\/v1\/items\/([^/]+)\/file$/.exec(url.pathname);
       if (download && (req.method === 'GET' || req.method === 'HEAD')) {
         requireScope(client, 'read');
-        const { attachment, path } = memory.files.primary(decodeURIComponent(download[1]!));
+        const { attachment, path } = memory.files.primary(decodePart(download[1]!));
+        // An attachment row can arrive through sync before its bytes do.
+        if (!existsSync(path)) throw new HttpError(404, 'not_found', "This file's contents haven't arrived on this device yet.");
         res.writeHead(200, {
           'Content-Type': attachment.mimeType,
           'Content-Length': attachment.size,
@@ -115,7 +129,9 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
           'Cache-Control': 'private, max-age=31536000, immutable',
         });
         if (req.method === 'HEAD') return void res.end();
-        return void createReadStream(path).pipe(res);
+        return void pipeline(createReadStream(path), res, (error) => {
+          if (error) res.destroy();
+        });
       }
 
       const match = matchRoute(req.method ?? 'GET', url.pathname);
@@ -123,6 +139,7 @@ export function createApiServer(memory: EnveMemory, options: ApiServerOptions): 
       if (match.route.scope) requireScope(client, match.route.scope);
       if (replay) return replayResponse(res, replay);
       const body = req.method === 'GET' ? undefined : await readJson(req);
+      // Set after the body is read: another request may have run in the meantime.
       memory.actor = `api:${client.name}`;
       const result = match.route.handle({ memory, client, params: match.params, query: url.searchParams, body });
       if (req.method !== 'GET') changed();
@@ -190,7 +207,7 @@ function matchRoute(method: string, path: string): { route: Route; params: strin
   for (const route of routes) {
     if (route.method !== method) continue;
     const m = route.pattern.exec(path);
-    if (m) return { route, params: m.slice(1).map(decodeURIComponent) };
+    if (m) return { route, params: m.slice(1).map(decodePart) };
   }
   return undefined;
 }
@@ -226,6 +243,14 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
     return parsed as Record<string, unknown>;
   } catch {
     throw new HttpError(400, 'invalid_json', 'Request body must be a JSON object.');
+  }
+}
+
+function decodePart(part: string): string {
+  try {
+    return decodeURIComponent(part);
+  } catch {
+    throw new HttpError(400, 'invalid', 'Malformed percent-encoding in the path.');
   }
 }
 
