@@ -664,17 +664,19 @@ function connectInstructions(): string {
   const node = process.execPath;
   const script = fileURLToPath(import.meta.url);
   const args = [script, 'mcp', ...(opts.home ? ['--home', opts.home] : [])];
+  // Inside the packaged desktop app, "node" is the app's own Electron binary, which only acts as Node with this set.
+  const env = process.env.ELECTRON_RUN_AS_NODE ? { ELECTRON_RUN_AS_NODE: '1' } : undefined;
   const quoted = [node, ...args].map((a) => JSON.stringify(a)).join(' ');
   return `Claude Code:
-  claude mcp add --scope user ${SERVER_NAME} -- ${quoted}
+  claude mcp add --scope user ${SERVER_NAME}${env ? ' -e ELECTRON_RUN_AS_NODE=1' : ''} -- ${quoted}
 
 Codex (~/.codex/config.toml):
   [mcp_servers.${SERVER_NAME}]
   command = ${JSON.stringify(node)}
-  args = ${JSON.stringify(args)}
+  args = ${JSON.stringify(args)}${env ? '\n  env = { ELECTRON_RUN_AS_NODE = "1" }' : ''}
 
 Claude Desktop, Cursor and other JSON-configured clients:
-  ${JSON.stringify({ mcpServers: { [SERVER_NAME]: { command: node, args } } })}
+  ${JSON.stringify({ mcpServers: { [SERVER_NAME]: { command: node, args, ...(env ? { env } : {}) } } })}
 
 Clients that connect over HTTP (remote agents, other machines):
   1. enve-memory serve            (the desktop app runs this for you)
