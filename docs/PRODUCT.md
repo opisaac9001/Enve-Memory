@@ -1,4 +1,4 @@
-# Enve Memory — Product
+# Product
 
 > Save anything once. Find it yourself later, or let any AI you choose find and use it. Your data stays on your computer unless you explicitly choose otherwise.
 
@@ -12,7 +12,7 @@ Every feature has to serve that loop. If it doesn't, it waits.
 
 ## What it holds
 
-Everything is an **item**. Today there are four types: `note`, `bookmark`, `task` and `decision`. Files, images, reminders, conversations and documents come later, as more item types. Items can belong to a **project**, carry **tags**, and **relate** to other items.
+Everything is an **item**: a `note`, `bookmark`, `task`, `decision`, `file` or `image`. Items can belong to a **project**, carry **tags**, **relate** to other items, sit on a shelf (Read, Watch, Buy, Revisit) and carry a reminder.
 
 Each project has three layers of context:
 
@@ -36,7 +36,7 @@ Underneath all three, an **activity log** records every change and which client 
 
 ## Who it's for
 
-People who work with several AI tools and are tired of re-explaining their projects to each one. The first impressive demo:
+People who work with several AI tools and are tired of re-explaining their projects to each one. For example:
 
 1. Save the Security+ 2.0 protocol docs and an ESP32 library to *Garage Door* from the browser.
 2. Jot a note about needing a bench-test rig.
@@ -44,10 +44,6 @@ People who work with several AI tools and are tired of re-explaining their proje
 4. *"Add a task to build the bench simulator."* Claude calls `create_task`.
 5. Open Codex. It sees the same task and the same history.
 
-That is the product. Everything else is expansion.
+## Out of scope
 
-## Explicitly not now
-
-Accounts, billing, cloud hosting, teams and collaboration, social features and public profiles, a custom model, a complex graph UI, analytics, a web app. Each of these could eat months without improving the core loop.
-
-See [ROADMAP.md](ROADMAP.md) for phases and status.
+Accounts, cloud hosting, teams, social features and public profiles, analytics and a custom model. Each could take months without improving the core loop. See the [roadmap](ROADMAP.md) for what's next.

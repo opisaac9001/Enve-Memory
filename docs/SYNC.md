@@ -1,6 +1,6 @@
 # Sync
 
-Enve Memory syncs a library between computers through a **folder you already sync**: iCloud Drive, Dropbox, OneDrive, Syncthing or a NAS share. There's no server of ours in the middle. Phones don't sync; they talk to a computer's local API (see SECURITY.md).
+Enve Memory syncs a library between computers through a **folder you already sync**: iCloud Drive, Dropbox, OneDrive, Syncthing or a NAS share. There's no server of ours in the middle. Phones don't sync; they talk to a computer's local API (see [SECURITY.md](SECURITY.md)).
 
 ```bash
 enve-memory sync ~/Library/Mobile\ Documents/com~apple~CloudDocs/Enve\ Memory   # set the folder and sync now
@@ -24,7 +24,7 @@ Each device writes only its own `devices/<id>/` folder, and each segment is writ
 
 ## What a record is
 
-Every change is stamped with a **hybrid logical clock**: ISO time, a 4-digit counter, then the device id. It sorts by time, never goes backwards, and moves past any stamp the device has seen, so a machine with a slow clock still orders its later edits correctly.
+Every change is stamped with a **hybrid logical clock**: ISO time, a 6-digit counter, then the device id. It sorts by time, never goes backwards, and moves past any stamp the device has seen, so a machine with a slow clock still orders its later edits correctly.
 
 A segment line holds an entity's **full current state** (or `null` for a delete) at its clock stamp:
 
@@ -46,7 +46,7 @@ A record also carries `base`: the version the writing device had last exchanged 
 - Every pending segment from every device is read first, then applied in one global order, so a peer's folder being read first can't strand an item without its project. References that still arrive before their target (an item whose project hasn't synced yet, a relation between items not yet here) wait in `sync_pending` and are linked once the target lands.
 - Clock stamps use a 6-digit counter that rolls into the next millisecond on overflow. Stamps more than 5 minutes ahead of this machine's clock are applied but never followed, so one peer with a wrong clock can't drag every device forward.
 - Segment names only grow, even after a backup restore rolls the change sequence back.
-- See SECURITY.md for how records from the folder are validated.
+- See [SECURITY.md](SECURITY.md#the-sync-folder-is-untrusted-input) for how records from the folder are validated.
 
 ## Encryption
 
@@ -56,9 +56,9 @@ The first device to set a passphrase on an empty folder creates the key, and eve
 
 ## Not synced
 
-API client tokens, settings (fetch, AI provider, sync folder), the semantic index (each device rebuilds its own), and backups.
+API client tokens, settings (fetch, AI provider, sync folder), automation rules, the semantic index (each device rebuilds its own), and backups.
 
-## Not yet
+## Limitations
 
-- **Segment compaction** for very long-lived libraries.
-- **A LAN peer transport** for machines without a shared folder.
+- Segments are never compacted, so the shared folder grows with the library's full change history.
+- Computers sync only through a shared folder. There's no direct connection between machines on a LAN.

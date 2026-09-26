@@ -25,7 +25,7 @@ Started by `enve-memory serve` or by the desktop app. Implemented and tested in 
 7. **Request bodies are capped** (JSON at 2 MB), and errors never echo stack traces.
 8. **Attribution:** REST writes are recorded as `api:<client name>`. MCP writes are recorded as `mcp:<clientInfo name>`, falling back to the token's client name for stateless 2025-era requests.
 
-On a LAN, traffic is plain HTTP unless the user puts it behind Tailscale (WireGuard-encrypted) or a TLS proxy. This matches the accepted-risk stance of the other Enve apps toward user-owned LAN servers, and the docs recommend Tailscale for anything beyond the home network.
+On a LAN, traffic is plain HTTP unless the user puts it behind Tailscale (WireGuard-encrypted) or a TLS proxy. Use Tailscale for anything beyond the home network.
 
 ## The sync folder is untrusted input
 
@@ -38,9 +38,9 @@ Another machine writes to the shared folder, and so does anyone who can reach it
 
 Each record applies under its own savepoint, so a malformed one is counted as `rejected` and skipped rather than blocking sync. Fetched blobs are re-hashed and must match their name. With encryption, each file's name is bound in as GCM associated data, so sealed files can't be swapped between names. `blobPath` refuses anything that isn't a hash, and export re-derives slugs and filenames, so no value from the folder can reach a path outside the library or the export.
 
-## Secrets we hold (Phase 4)
+## Secrets
 
-API keys for BYO AI providers go in the OS credential store (macOS Keychain, Windows Credential Manager, libsecret), never in SQLite or config files. Only outgoing secrets live there. Incoming client tokens are stored hashed (see above).
+The desktop app encrypts API keys for BYO AI providers with Electron's `safeStorage` (macOS Keychain, Windows DPAPI, libsecret) into `desktop-secrets.json` (mode 0600) in the library folder. If the OS has no credential store, the key isn't saved. The CLI reads keys from environment variables. Keys never go into SQLite, so backups, exports and sync never carry them. Incoming client tokens are stored hashed (see above).
 
 ## Content safety
 
@@ -53,4 +53,4 @@ API keys for BYO AI providers go in the OS credential store (macOS Keychain, Win
 
 ## Reporting
 
-Before any public release: a `SECURITY.md` contact at the repository root and a private disclosure channel.
+See [SECURITY.md](../SECURITY.md) at the repository root for how to report a vulnerability privately.

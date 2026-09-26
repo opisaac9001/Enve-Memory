@@ -1,8 +1,18 @@
 {
   "name": "enve-memory",
+  "version": "0.1.0",
+  "description": "One memory for you and every AI you use: local-first links, notes, files and decisions, shared over MCP.",
   "private": true,
-  "type": "module",
   "license": "AGPL-3.0-only",
+  "homepage": "https://github.com/opisaac9001/Enve-Memory#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/opisaac9001/Enve-Memory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/opisaac9001/Enve-Memory/issues"
+  },
+  "type": "module",
   "engines": {
     "node": ">=24.0.0"
   },

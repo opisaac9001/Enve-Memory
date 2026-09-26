@@ -157,11 +157,11 @@ test('MCP over HTTP honors the token and its scopes, in both protocol eras', asy
 });
 
 test('pairing links carry the server, token and device name', () => {
-  const link = new URL(pairingLink('http://192.168.1.20:49231', 'em_abc', 'Isaac\'s iPhone'));
+  const link = new URL(pairingLink('http://192.168.1.20:49231', 'em_abc', 'Sam\'s iPhone'));
   assert.equal(link.protocol, 'enve-memory:');
   assert.equal(link.searchParams.get('url'), 'http://192.168.1.20:49231');
   assert.equal(link.searchParams.get('token'), 'em_abc');
-  assert.equal(link.searchParams.get('name'), "Isaac's iPhone");
+  assert.equal(link.searchParams.get('name'), "Sam's iPhone");
 });
 
 test('an Idempotency-Key makes retried writes safe', async () => {

@@ -11,8 +11,8 @@ import Testing
     }
 
     @Test func acceptsPercentEncodedSpacesUnicodeAndSurroundingWhitespace() throws {
-        let link = try PairingLink(parsing: "  enve-memory://pair?name=Isaac%E2%80%99s%20iPhone&token=em_abc&url=https%3A%2F%2Fmac.tail1234.ts.net%2F \n")
-        #expect(link.name == "Isaac’s iPhone")
+        let link = try PairingLink(parsing: "  enve-memory://pair?name=Sam%E2%80%99s%20iPhone&token=em_abc&url=https%3A%2F%2Fmac.tail1234.ts.net%2F \n")
+        #expect(link.name == "Sam’s iPhone")
         #expect(link.baseURL == URL(string: "https://mac.tail1234.ts.net"))
     }
 

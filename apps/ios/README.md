@@ -18,7 +18,7 @@ Screenshots use the fictional demo library from `node scripts/demo-library.ts <e
 
 ## Requirements
 
-- Xcode 26 or newer (developed on Xcode 27 beta), iOS 17.0+ deployment target, Swift 6 language mode.
+- Xcode 26 or newer, iOS 17.0+ deployment target, Swift 6 language mode.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen). The `.xcodeproj` is generated from `project.yml`; run `xcodegen generate` after adding files or changing `project.yml`.
 - An Enve Memory server: `enve-memory serve --lan` on the computer that holds the library.
 
@@ -28,8 +28,7 @@ Screenshots use the fictional demo library from `node scripts/demo-library.ts <e
 cd apps/ios
 xcodegen generate
 xcodebuild -project EnveMemory.xcodeproj -scheme EnveMemory \
-  -destination "platform=iOS Simulator,name=iPhone Air" \
-  -derivedDataPath /Volumes/games/EnveBuildTmp/DerivedData-memory build
+  -destination "platform=iOS Simulator,name=iPhone Air" build
 ```
 
 To run on a device, set `DEVELOPMENT_TEAM` in `project.yml` (both targets share it) and register the App Group `group.com.enve.memory` for `com.enve.memory` and `com.enve.memory.share`. Simulator builds are ad-hoc signed and need no team.
@@ -107,7 +106,7 @@ Design choices worth knowing:
 - **One path for writes.** `OutboxService.submit` tries the server and falls back to the outbox only for retryable failures (unreachable, timeouts, 5xx, 401). A 400 or 413 is shown to the user, since resending the same request can't succeed.
 - **The share extension never flushes.** It tries the server once, and anything left goes to the outbox for the app to send. Only one process drains the queue, so flushing never double-sends in-process; concurrent `flush` calls collapse into one.
 - **The pairing lives in the Keychain** as one item in the `group.com.enve.memory` access group, accessible after first unlock (so background refresh works while the phone is locked). If an unsigned build lacks the entitlement, the store falls back to the app's default access group.
-- **The design system is ported, not linked.** `Shared/Design` is a trimmed copy of the Hearth contract from Enve Notes and the Book Player: ink/paper/OLED palettes with the ember accent `#F5921A`, serif display type on text styles (so Dynamic Type applies live), the 4 pt spacing rhythm, radii (inner 14, card 20, bar 30), the floating Mantel dock with a published `bottomBarInset`, and a Reduce Motion-aware ambient background. Long text sits on opaque surfaces with no glow behind it.
+- **The design system is ported, not linked.** `Shared/Design` is a trimmed copy of Hearth, the design system the other Enve apps share: ink/paper/OLED palettes with the ember accent `#F5921A`, serif display type on text styles (so Dynamic Type applies live), the 4 pt spacing rhythm, radii (inner 14, card 20, bar 30), the floating Mantel dock with a published `bottomBarInset`, and a Reduce Motion-aware ambient background. Long text sits on opaque surfaces with no glow behind it.
 
 ## Tests
 
@@ -116,7 +115,7 @@ The package tests use Swift Testing and run on macOS or the simulator:
 ```bash
 cd apps/ios/Packages/EnveMemoryKit && xcrun swift test          # macOS, a few seconds
 cd apps/ios && xcodebuild test -project EnveMemory.xcodeproj -scheme EnveMemory \
-  -destination "platform=iOS Simulator,name=iPhone Air" -derivedDataPath /Volumes/games/EnveBuildTmp/DerivedData-memory
+  -destination "platform=iOS Simulator,name=iPhone Air"
 ```
 
 (`xcrun swift` avoids a stale toolchain that `swiftly` may put first on `PATH`.)

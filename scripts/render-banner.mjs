@@ -66,7 +66,7 @@ try {
     await tab.setContent(page({
       ...shot,
       title: 'One memory for you and <em>every AI you use</em>.',
-      tagline: 'Save links, notes, files and decisions once. Claude, Codex and any MCP client read and write the same library — on your computer, not ours.',
+      tagline: 'Save links, notes, files and decisions once. Claude, Codex and any MCP client read and write the same library, and it stays on your computer.',
     }));
     await tab.waitForLoadState('networkidle');
     await tab.screenshot({ path: join(out, shot.file) });

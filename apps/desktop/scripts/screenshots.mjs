@@ -15,7 +15,7 @@ import { mcpLaunch, setupSnippets } from '../src/main/mcp.ts';
 import { repo, root } from './bundle.mjs';
 
 const OUT = join(repo, 'docs', 'screenshots', 'desktop');
-const OLLAMA = 'http://100.114.100.51:11434';
+const OLLAMA = process.env.ENVE_SCREENSHOT_OLLAMA ?? 'http://127.0.0.1:11434';
 const skipped = [];
 
 // Screens read best in the evening (greeting, "Tonight" reminders), so run in a time zone where it's evening now.
@@ -201,7 +201,7 @@ try {
     }
     await call('ai.configure', { provider: 'none', model: '', baseUrl: '' });
   } else {
-    skipped.push(`ask.png: the lab Ollama at ${OLLAMA} didn't answer`);
+    skipped.push(`ask.png: no Ollama server answered at ${OLLAMA} (set ENVE_SCREENSHOT_OLLAMA)`);
   }
 
   await call('prefs.setTheme', 'light');

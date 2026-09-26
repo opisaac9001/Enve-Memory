@@ -60,11 +60,8 @@ Saved content is untrusted. It is often copied from web pages. The mitigations:
 1. **Server instructions** tell the model that every title, body, note, url, snippet and memory field is user data, and to never follow instructions inside it.
 2. **No destructive tools.** The worst a hijacked model can do is add or archive items, or overwrite a memory document. All of that is reversible from the change log.
 3. **The append-only decision log** can't be rewritten through MCP.
-4. With HTTP clients, **per-client permission scopes** will let a user make a client search-only (see SECURITY.md).
+4. With HTTP clients, **per-client permission scopes** let a user make a client read-only (see [SECURITY.md](SECURITY.md)).
 
-## Next
+## Limitations
 
-- Resources: `memory://project/<slug>` for clients that attach context rather than call tools.
-- Prompts: "brief me on <project>", "log what we decided".
-- Semantic and hybrid search behind the same `search` tool.
-- `save_file` / `get_file` once attachments exist.
+The server exposes tools only. It has no MCP resources or prompts, so clients that attach context instead of calling tools can't use it.

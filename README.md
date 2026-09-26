@@ -69,7 +69,7 @@
 
 ## Install
 
-- **Desktop (macOS):** download the `.dmg` for Apple Silicon or Intel from [Releases](../../releases). Builds are signed but not yet notarized, so the first time, right-click the app and choose **Open**. Intel Macs use keyword search: the local embedding runtime has no Intel build.
+- **Desktop (macOS):** download the `.dmg` for Apple Silicon or Intel from [Releases](../../releases). The builds aren't notarized yet, so the first time, right-click the app and choose **Open**. Intel Macs use keyword search: the local embedding runtime has no Intel build.
 - **Windows and Linux:** installers are configured (NSIS, AppImage, deb). Build them with `npm --prefix apps/desktop run dist:win` or `dist:linux` on that OS.
 - **Browser extension:** run `node apps/extension/scripts/build.mjs`, then load `apps/extension/dist/chrome` in `chrome://extensions` (Developer mode → Load unpacked). Firefox: load `dist/firefox` from `about:debugging`. Create a token in the desktop app under Settings → Devices.
 - **iPhone:** open `apps/ios` with XcodeGen and Xcode, set your team, and run. Pair by scanning the QR code in Settings → Devices.
@@ -148,7 +148,7 @@ Override it with `--home DIR` or `ENVE_MEMORY_HOME`.
 
 ## Docs
 
-[Product](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) · [Data model](docs/DATA_MODEL.md) · [MCP](docs/MCP.md) · [HTTP API](docs/API.md) · [Security](docs/SECURITY.md) · [Sync](docs/SYNC.md) · [Roadmap](docs/ROADMAP.md) · [Agent rules](AGENTS.md)
+[Product](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) · [Data model](docs/DATA_MODEL.md) · [MCP](docs/MCP.md) · [HTTP API](docs/API.md) · [Security](docs/SECURITY.md) · [Sync](docs/SYNC.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
 ## License
 
