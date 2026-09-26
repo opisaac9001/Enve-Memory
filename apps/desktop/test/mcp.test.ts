@@ -41,7 +41,7 @@ test('the Claude Code command sets the env var and quotes paths with spaces', ()
   const { claudeCode } = setupSnippets(launch, 'http://127.0.0.1:49231', 'darwin');
   assert.equal(
     claudeCode,
-    "claude mcp add --scope user enve-memory -e ELECTRON_RUN_AS_NODE=1 -- '/Applications/Enve Memory.app/Contents/MacOS/Enve Memory' '/Applications/Enve Memory.app/Contents/Resources/cli.mjs' mcp",
+    `claude mcp add --scope user enve-memory -e ELECTRON_RUN_AS_NODE=1 -- '/Applications/Enve Memory.app/Contents/MacOS/Enve Memory' '${join(packaged.resourcesPath, 'cli.mjs')}' mcp`,
   );
 });
 
