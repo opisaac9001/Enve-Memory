@@ -10,9 +10,7 @@ The phone companion for Petty Memory. The library stays on your computer; the ph
 |---|---|---|
 | ![Search](../../docs/screenshots/ios/search.png) | ![Reminders shelf](../../docs/screenshots/ios/reminders.png) | ![Watch shelf](../../docs/screenshots/ios/shelf-watch.png) |
 
-| Share sheet | Settings | Paper mode |
-|---|---|---|
-| ![Saving a link from Safari with intent and reminder](../../docs/screenshots/ios/share.png) | ![Settings, connected](../../docs/screenshots/ios/settings.png) | ![Home in Paper mode](../../docs/screenshots/ios/home-light.png) |
+![Home in Paper mode](../../docs/screenshots/ios/home-light.png)
 
 Screenshots use the fictional demo library from `node scripts/demo-library.ts <empty folder>`.
 

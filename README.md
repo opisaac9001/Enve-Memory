@@ -62,10 +62,10 @@
 
 ### iPhone
 
-| | | | |
-|---|---|---|---|
-| ![Home](docs/screenshots/ios/home.png) | ![Project](docs/screenshots/ios/project.png) | ![Item](docs/screenshots/ios/item.png) | ![Share sheet](docs/screenshots/ios/share.png) |
-| Home and shelves | Project briefing | Archived page | Save from any app |
+| | | |
+|---|---|---|
+| ![Home](docs/screenshots/ios/home.png) | ![Project](docs/screenshots/ios/project.png) | ![Item](docs/screenshots/ios/item.png) |
+| Home and shelves | Project briefing | Archived page |
 
 ## Install
 
