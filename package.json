@@ -4,13 +4,13 @@
   "description": "One memory for you and every AI you use: local-first links, notes, files and decisions, shared over MCP.",
   "private": true,
   "license": "AGPL-3.0-only",
-  "homepage": "https://github.com/opisaac9001/Enve-Memory#readme",
+  "homepage": "https://github.com/petty-foss-dev/Enve-Memory#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/opisaac9001/Enve-Memory.git"
+    "url": "git+https://github.com/petty-foss-dev/Enve-Memory.git"
   },
   "bugs": {
-    "url": "https://github.com/opisaac9001/Enve-Memory/issues"
+    "url": "https://github.com/petty-foss-dev/Enve-Memory/issues"
   },
   "type": "module",
   "engines": {

@@ -4,7 +4,7 @@ Enve Memory holds a person's notes, links and project history, and gives AI agen
 
 ## Reporting a vulnerability
 
-Please report privately, not in a public issue: use **Report a vulnerability** on the repository's [Security tab](https://github.com/opisaac9001/Enve-Memory/security/advisories/new). Include:
+Please report privately, not in a public issue: use **Report a vulnerability** on the repository's [Security tab](https://github.com/petty-foss-dev/Enve-Memory/security/advisories/new). Include:
 
 - what an attacker can do, and under which setup (stdio MCP, the local HTTP API with or without `--lan`, the browser extension, sync)
 - steps or a proof of concept
