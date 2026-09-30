@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Enve Memory</string>
+	<string>Petty Memory</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -51,6 +51,6 @@
 		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Enve Memory connects to the library on your computer over your home network.</string>
+	<string>Petty Memory connects to the library on your computer over your home network.</string>
 </dict>
 </plist>

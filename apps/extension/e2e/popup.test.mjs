@@ -144,7 +144,7 @@ describe('popup, Settings and instant saves in Chromium', () => {
     assert.equal(saved.project.name, 'Garage Door');
   });
 
-  test('offline: saves queue with a badge count and sync when Enve Memory is back', async () => {
+  test('offline: saves queue with a badge count and sync when Petty Memory is back', async () => {
     await env.openTab('/offline.html');
     const offlineTab = await env.tabIdFor(env.siteUrl('/offline.html'));
     await env.server.pause();

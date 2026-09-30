@@ -134,10 +134,10 @@ describe('errors', () => {
   test('describeError gives the next step for each failure', () => {
     const url = 'http://127.0.0.1:49231';
     const cases = [
-      [new ApiError('offline', ''), /Can't reach Enve Memory at http:\/\/127\.0\.0\.1:49231\. Start Enve Memory or run `enve-memory serve`/],
+      [new ApiError('offline', ''), /Can't reach Petty Memory at http:\/\/127\.0\.0\.1:49231\. Start Petty Memory or run `petty-memory serve`/],
       [new ApiError('timeout', ''), /didn't answer in time/],
-      [new ApiError('not_enve', ''), /Something other than Enve Memory/],
-      [new ApiError('unauthorized', 'x', 401), /`enve-memory clients add "Browser" --scope read,capture`/],
+      [new ApiError('not_enve', ''), /Something other tha Petty Memory/],
+      [new ApiError('unauthorized', 'x', 401), /`petty-memory clients add "Browser" --scope read,capture`/],
       [new ApiError('insufficient_scope', 'This client lacks the "capture" scope.', 403), /lacks the "capture" scope\. Create a token/],
       [new ApiError('forbidden_host', 'x', 403), /--lan/],
       [new ApiError('forbidden_origin', 'x', 403), /refused this browser extension/],

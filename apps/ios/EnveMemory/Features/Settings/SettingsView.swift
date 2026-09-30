@@ -22,7 +22,7 @@ struct SettingsView: View {
         .confirmationDialog("Unpair this phone?", isPresented: $confirmUnpair, titleVisibility: .visible) {
             Button("Unpair", role: .destructive) { unpair() }
         } message: {
-            Text("The token is removed from this phone. It stays valid on your computer until you revoke it with `enve-memory clients revoke`.")
+            Text("The token is removed from this phone. It stays valid on your computer until you revoke it with `petty-memory clients revoke`.")
         }
     }
 
@@ -142,7 +142,7 @@ struct SettingsView: View {
             Overline("About")
             HearthCard {
                 VStack(alignment: .leading, spacing: HearthSpacing.sm) {
-                    Text("Enve Memory \(Bundle.main.shortVersion)")
+                    Text("Petty Memory \(Bundle.main.shortVersion)")
                         .font(HearthFont.cardTitle)
                     Text("Your library stays on your computer. This phone keeps only its pairing token, in the Keychain, and an outbox of captures waiting to sync.")
                         .font(HearthFont.footnote)

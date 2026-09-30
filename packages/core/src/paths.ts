@@ -10,7 +10,7 @@ export interface MemoryPaths {
   models: string;
 }
 
-/** Matches Electron's `app.getPath('userData')` for "Enve Memory" so the CLI and desktop app share one library. */
+// Keep the original data directory so existing libraries remain available after the app rename.
 export function defaultHome(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string {
   if (env.ENVE_MEMORY_HOME) return env.ENVE_MEMORY_HOME;
   switch (platform) {

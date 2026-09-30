@@ -36,7 +36,7 @@ export function RemindersView() {
     <div className="page">
       <header className="page-header">
         <h1>Reminders</h1>
-        <p className="subtitle">Enve Memory taps you on the shoulder at the time you chose, with a notification that opens the item.</p>
+        <p className="subtitle">Petty Memory taps you on the shoulder at the time you chose, with a notification that opens the item.</p>
       </header>
       {reminders.data && due.length + upcoming.length === 0 && (
         <Empty title="No reminders">Use the bell on any item to be reminded tonight, tomorrow, this weekend or on a date you pick.</Empty>

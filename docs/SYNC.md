@@ -1,12 +1,12 @@
 # Sync
 
-Enve Memory syncs a library between computers through a **folder you already sync**: iCloud Drive, Dropbox, OneDrive, Syncthing or a NAS share. There's no server of ours in the middle. Phones don't sync; they talk to a computer's local API (see [SECURITY.md](SECURITY.md)).
+Petty Memory syncs a library between computers through a **folder you already sync**: iCloud Drive, Dropbox, OneDrive, Syncthing or a NAS share. There's no server of ours in the middle. Phones don't sync; they talk to a computer's local API (see [SECURITY.md](SECURITY.md)).
 
 ```bash
-enve-memory sync ~/Library/Mobile\ Documents/com~apple~CloudDocs/Enve\ Memory   # set the folder and sync now
-enve-memory sync                                                               # sync again
-enve-memory sync off                                                           # stop (nothing is deleted)
-enve-memory sync <new empty folder> --passphrase -                             # encrypted sync; reads the passphrase from stdin
+petty-memory sync ~/Library/Mobile\ Documents/com~apple~CloudDocs/Enve\ Memory   # set the folder and sync now
+petty-memory sync                                                               # sync again
+petty-memory sync off                                                           # stop (nothing is deleted)
+petty-memory sync <new empty folder> --passphrase -                             # encrypted sync; reads the passphrase from stdin
 ```
 
 The desktop app and `serve` sync every 2 minutes while a folder is set. Implementation: [`packages/core/src/sync.ts`](../packages/core/src/sync.ts). Tests: [`packages/core/test/sync.test.ts`](../packages/core/test/sync.test.ts).

@@ -5,6 +5,7 @@
   "type": "module",
   "license": "AGPL-3.0-only",
   "bin": {
+    "petty-memory": "./src/main.ts",
     "enve-memory": "./src/main.ts"
   },
   "dependencies": {

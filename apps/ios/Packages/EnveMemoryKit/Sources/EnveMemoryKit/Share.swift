@@ -86,7 +86,7 @@ public struct ShareItemLoader {
 
     public enum LoadError: Error, LocalizedError {
         case nothingToSave
-        public var errorDescription: String? { "There's nothing here Enve Memory can save." }
+        public var errorDescription: String? { "There's nothing here Petty Memory can save." }
     }
 
     enum Kind: Equatable {

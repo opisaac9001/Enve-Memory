@@ -1,10 +1,10 @@
 # Security policy
 
-Enve Memory holds a person's notes, links and project history, and gives AI agents access to them. We take reports seriously.
+Petty Memory holds a person's notes, links and project history, and gives AI agents access to them. We take reports seriously.
 
 ## Reporting a vulnerability
 
-Please report privately, not in a public issue: use **Report a vulnerability** on the repository's [Security tab](https://github.com/petty-foss-dev/Enve-Memory/security/advisories/new). Include:
+Please report privately, not in a public issue: use **Report a vulnerability** on the repository's [Security tab](https://github.com/petty-foss-dev/Petty-Memory/security/advisories/new). Include:
 
 - what an attacker can do, and under which setup (stdio MCP, the local HTTP API with or without `--lan`, the browser extension, sync)
 - steps or a proof of concept
@@ -27,4 +27,4 @@ The design and its accepted trade-offs are documented in [docs/SECURITY.md](docs
 
 ## Supported versions
 
-Enve Memory is pre-1.0; fixes land on `main` and in the next release.
+Petty Memory is pre-1.0; fixes land on `main` and in the next release.

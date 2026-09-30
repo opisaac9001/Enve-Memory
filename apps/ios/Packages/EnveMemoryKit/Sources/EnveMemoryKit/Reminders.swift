@@ -88,7 +88,7 @@ public enum ReminderPlan {
     public static let pendingPrefix = identifierPrefix + "pending."
 
     public static func pendingRequest(entryID: UUID, title: String, fireDate: Date) -> ReminderRequest {
-        ReminderRequest(identifier: pendingPrefix + entryID.uuidString, itemID: entryID.uuidString, title: title, body: "Enve Memory",
+        ReminderRequest(identifier: pendingPrefix + entryID.uuidString, itemID: entryID.uuidString, title: title, body: "Petty Memory",
                         fireDate: fireDate, url: URL(string: "\(PairingLink.scheme)://home")!)
     }
 

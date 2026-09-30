@@ -97,9 +97,9 @@ final class ShareModel {
                 queued += 1
             }
             if pairing == nil {
-                phase = .finished("Saved — open Enve Memory to pair, then it will sync")
+                phase = .finished("Saved — open Petty Memory to pair, then it will sync")
             } else {
-                phase = .finished(queued > 0 ? "Saved — will sync when you're back on your network" : "Saved to Enve Memory")
+                phase = .finished(queued > 0 ? "Saved — will sync when you're back on your network" : "Saved to Petty Memory")
             }
             try? await Task.sleep(for: .seconds(queued > 0 || pairing == nil ? 1.6 : 0.8))
             finish()

@@ -13,7 +13,7 @@ export const SHELF_COPY: Record<Shelf, { title: string; intro: string; empty: st
   revisit: { title: 'Revisit', intro: 'Things worth coming back to.', empty: 'Mark an item Revisit from its detail view.' },
   unopened: {
     title: 'Unopened',
-    intro: `Links saved more than ${UNOPENED_DAYS} days ago that you haven’t opened from Enve Memory yet.`,
+    intro: `Links saved more than ${UNOPENED_DAYS} days ago that you haven’t opened from Petty Memory yet.`,
     empty: 'Nothing forgotten. Links you open from here drop off this shelf.',
   },
 };

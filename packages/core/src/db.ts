@@ -39,7 +39,7 @@ export function migrate(db: DatabaseSync, { migrations = MIGRATIONS, backupDir }
   if (current > latest) {
     throw new MemoryError(
       'schema',
-      `This library was written by a newer Enve Memory (schema ${current}; this build supports ${latest}). Update Enve Memory to open it.`,
+      `This library was written by a newer Petty Memory (schema ${current}; this build supports ${latest}). Update Petty Memory to open it.`,
     );
   }
   if (current === latest) return;

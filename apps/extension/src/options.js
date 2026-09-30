@@ -72,7 +72,7 @@ async function finishConnect(granted, serverUrl, token, persist) {
   setBusy(true);
   try {
     if (!(await granted.catch(() => false))) {
-      showResult('error', `Access to ${new URL(serverUrl).host} wasn’t granted.`, 'The extension needs it to reach Enve Memory there.');
+      showResult('error', `Access to ${new URL(serverUrl).host} wasn’t granted.`, 'The extension needs it to reach Petty Memory there.');
       return;
     }
     if (persist) await saveSettings({ serverUrl, token });
@@ -90,16 +90,16 @@ async function testConnection(serverUrl, token, saved) {
   try {
     status = await client.status();
   } catch (error) {
-    return showResult('error', `${prefix}Enve Memory isn’t reachable.`, describeError(error, serverUrl));
+    return showResult('error', `${prefix}Petty Memory isn’t reachable.`, describeError(error, serverUrl));
   }
   if (!token) {
-    return showResult('warn', `${prefix}Enve Memory ${status.version} is running.`, `Add an access token to save pages. Create one with \`${TOKEN_COMMAND}\`.`);
+    return showResult('warn', `${prefix}Petty Memory ${status.version} is running.`, `Add an access token to save pages. Create one with \`${TOKEN_COMMAND}\`.`);
   }
   let me;
   try {
     me = await client.whoami();
   } catch (error) {
-    return showResult('error', `${prefix}Enve Memory ${status.version} is running, but the token didn’t work.`, describeError(error, serverUrl));
+    return showResult('error', `${prefix}Petty Memory ${status.version} is running, but the token didn’t work.`, describeError(error, serverUrl));
   }
   if (!canCapture(me.scopes)) {
     return showResult(
@@ -108,7 +108,7 @@ async function testConnection(serverUrl, token, saved) {
       `It has ${me.scopes.join(', ')}. Create one with \`${TOKEN_COMMAND}\`.`,
     );
   }
-  showResult('ok', `${prefix}Connected as ${me.name}`, `Scopes: ${me.scopes.join(', ')} · Enve Memory ${status.version}`);
+  showResult('ok', `${prefix}Connected as ${me.name}`, `Scopes: ${me.scopes.join(', ')} · Petty Memory ${status.version}`);
 }
 
 function showResult(kind, title, detail) {

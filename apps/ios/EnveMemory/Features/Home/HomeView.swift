@@ -42,7 +42,7 @@ struct HomeView: View {
         if items.isEmpty {
             if loaded, loadError == nil {
                 EmptyStateView(symbol: "tray", title: "Nothing saved yet",
-                               message: "Capture a note above, or share a link from Safari to Enve Memory.")
+                               message: "Capture a note above, or share a link from Safari to Petty Memory.")
             }
         } else {
             RowStack(data: items) { item in

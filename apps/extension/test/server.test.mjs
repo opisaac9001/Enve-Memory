@@ -4,7 +4,7 @@ import { createClient, describeError } from '../src/lib/api.js';
 import { bookmarkEntries, importEntries } from '../src/lib/bookmarks.js';
 import { startScratchServer } from './support/scratch-server.mjs';
 
-describe('client against a real enve-memory serve', () => {
+describe('client against a real petty-memory serve', () => {
   let server;
   let client;
   let project;
@@ -70,7 +70,7 @@ describe('client against a real enve-memory serve', () => {
     const bad = createClient({ serverUrl: server.url, token: 'em_not-a-real-token' });
     await assert.rejects(bad.whoami(), (error) => {
       assert.equal(error.code, 'unauthorized');
-      assert.match(describeError(error), /enve-memory clients add "Browser" --scope read,capture/);
+      assert.match(describeError(error), /petty-memory clients add "Browser" --scope read,capture/);
       return true;
     });
   });
@@ -160,7 +160,7 @@ describe('client against a real enve-memory serve', () => {
     const offline = createClient({ serverUrl: 'http://127.0.0.1:9', token: 'em_x', timeoutMs: 2000 });
     await assert.rejects(offline.status(), (error) => {
       assert.equal(error.code, 'offline');
-      assert.match(describeError(error, 'http://127.0.0.1:9'), /run `enve-memory serve`/);
+      assert.match(describeError(error, 'http://127.0.0.1:9'), /run `petty-memory serve`/);
       return true;
     });
   });

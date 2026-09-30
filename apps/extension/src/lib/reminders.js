@@ -8,7 +8,7 @@ export const REMINDER_PREFIX = 'reminder:';
 let checking = null;
 
 /**
- * Shows a notification per due reminder, then tells Enve Memory it was delivered so neither this browser nor the
+ * Shows a notification per due reminder, then tells Petty Memory it was delivered so neither this browser nor the
  * desktop app shows it again. Overlapping checks (an alarm and a settings change) share one run.
  */
 export function checkReminders() {

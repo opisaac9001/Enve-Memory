@@ -108,7 +108,7 @@ export function suggestions(item: ItemDetail): string {
   const lines = [`${label(item)}`, '', ai.summary ?? ''];
   if (ai.tags?.length) lines.push('', `Suggested tags:    ${ai.tags.map((t) => `#${t}`).join(' ')}`);
   if (ai.project) lines.push(`Suggested project: ${ai.project.name}`);
-  lines.push('', `Apply with: enve-memory accept ${item.id}`);
+  lines.push('', `Apply with: petty-memory accept ${item.id}`);
   return lines.join('\n');
 }
 

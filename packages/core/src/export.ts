@@ -22,7 +22,7 @@ const INBOX = { slug: 'inbox', name: 'Inbox' };
 
 /**
  * Writes the whole library as plain files: Markdown people can read and any notes app can open, plus a complete
- * metadata.json that a future Enve Memory (or anything else) can import. Useful even if this app disappears.
+ * metadata.json that a future Petty Memory (or anything else) can import. Useful even if this app disappears.
  */
 export class ExportService {
   private readonly ctx: Context;
@@ -160,7 +160,7 @@ function writeUnique(dir: string, name: string, taken: Set<string>, text: string
 }
 
 function exportReadme(projects: number, items: number): string {
-  return `# Enve Memory export
+  return `# Petty Memory export
 
 ${projects} projects and ${items} items, exported ${new Date().toISOString()}.
 

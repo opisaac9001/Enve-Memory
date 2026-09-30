@@ -47,7 +47,7 @@ export const selectText = (tab, selector) =>
     getSelection().addRange(range);
   }, selector);
 
-/** A scratch Enve Memory, a local site to save pages from, and Chromium with the extension loaded. */
+/** A scratch Petty Memory, a local site to save pages from, and Chromium with the extension loaded. */
 export async function startEnvironment() {
   const server = await startScratchServer();
   const projects = {

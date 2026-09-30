@@ -1,5 +1,5 @@
 appId: com.enve.memory
-productName: Enve Memory
+productName: Petty Memory
 copyright: Copyright © 2026 Enve Media. AGPL-3.0-only.
 directories:
   output: release
@@ -38,7 +38,7 @@ mac:
   identity: '-'
   hardenedRuntime: false
 dmg:
-  title: Enve Memory
+  title: Petty Memory
   artifactName: ${productName}-${version}-${arch}.${ext}
 win:
   target:

@@ -4,16 +4,16 @@ Implemented in [`packages/mcp/src/server.ts`](../packages/mcp/src/server.ts) wit
 
 ## Connecting
 
-Run `enve-memory connect` to get copy-paste setup for Claude Code, Codex, and JSON-configured clients (Claude Desktop, Cursor). From a checkout:
+Run `petty-memory connect` to get copy-paste setup for Claude Code, Codex, and JSON-configured clients (Claude Desktop, Cursor). From a checkout:
 
 ```bash
-claude mcp add --scope user enve-memory -- node "/path/to/Enve Memory/packages/cli/src/main.ts" mcp
+claude mcp add --scope user petty-memory -- node "/path/to/Petty Memory/packages/cli/src/main.ts" mcp
 ```
 
 Two transports:
 
-- **stdio**: the client launches `enve-memory mcp`. It gets every tool and needs no token. Several clients can each run their own stdio server against the same library (SQLite WAL).
-- **Streamable HTTP** at `http://127.0.0.1:49231/mcp`: served by `enve-memory serve` or the desktop app. It needs a bearer token (`enve-memory clients add NAME --scope read,write`), and the tools offered follow that token's scopes. See [SECURITY.md](SECURITY.md).
+- **stdio**: the client launches `petty-memory mcp`. It gets every tool and needs no token. Several clients can each run their own stdio server against the same library (SQLite WAL).
+- **Streamable HTTP** at `http://127.0.0.1:49231/mcp`: served by `petty-memory serve` or the desktop app. It needs a bearer token (`petty-memory clients add NAME --scope read,write`), and the tools offered follow that token's scopes. See [SECURITY.md](SECURITY.md).
 
 ## Tools
 

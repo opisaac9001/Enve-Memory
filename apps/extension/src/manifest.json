@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Enve Memory",
-  "description": "Save pages, links and selections to your local Enve Memory library, and find them again from a side panel.",
+  "name": "Petty Memory",
+  "description": "Save pages, links and selections to your local Petty Memory library, and find them again from a side panel.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -9,7 +9,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Save to Enve Memory",
+    "default_title": "Save to Petty Memory",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -59,7 +59,7 @@
       "suggested_key": {
         "default": "Alt+Shift+M"
       },
-      "description": "Open the Enve Memory side panel"
+      "description": "Open the Petty Memory side panel"
     },
     "quick-save": {
       "suggested_key": {

@@ -4,13 +4,13 @@ We are giving AI agents read/write access to a person's memory. The threat model
 
 ## Stdio MCP
 
-- **No network listener.** The AI client the user configured launches `enve-memory mcp` over stdio. Anything that can spawn that process already has the user's file access, so stdio needs no token and exposes every tool.
+- **No network listener.** The AI client the user configured launches `petty-memory mcp` over stdio. Anything that can spawn that process already has the user's file access, so stdio needs no token and exposes every tool.
 - **The database is an ordinary file owned by the user**, in the platform data folder. It is protected by OS file permissions and, where enabled, full-disk encryption.
 - **No destructive MCP tools**, the decision log is append-only, and every write has history. See [MCP.md](MCP.md#prompt-injection).
 
 ## Local HTTP API and MCP over HTTP (`packages/api`)
 
-Started by `enve-memory serve` or by the desktop app. Implemented and tested in `packages/api/test/api.test.ts`:
+Started by `petty-memory serve` or by the desktop app. Implemented and tested in `packages/api/test/api.test.ts`:
 
 1. **Binds to `127.0.0.1` only.** `--lan` binds `0.0.0.0` for phones and Tailscale, and is always an explicit opt-in.
 2. **`Host` must be a loopback name** unless LAN mode is on. This blocks DNS-rebinding attacks.

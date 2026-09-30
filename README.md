@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/logo.png" width="96" alt="Enve Memory">
+  <img src="docs/assets/logo.png" width="96" alt="Petty Memory">
 </p>
 
-<h1 align="center">Enve Memory</h1>
+<h1 align="center">Petty Memory</h1>
 
 <p align="center">
   <strong>One memory for you and every AI you use.</strong><br>
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/hero.png" alt="Enve Memory on the desktop, in the browser side panel and on iPhone">
+  <img src="docs/assets/hero.png" alt="Petty Memory on the desktop, in the browser side panel and on iPhone">
 </p>
 
 ## What you get
@@ -97,7 +97,7 @@ flowchart LR
   CC -- "MCP (stdio)" --> Core
   CX -- "MCP (stdio)" --> Core
   O -- "MCP (HTTP)" --> Core
-  Core["Enve Memory core<br/>services · rules · workers"] --> DB[("memory.sqlite<br/>FTS5 + vectors")]
+  Core["Petty Memory core<br/>services · rules · workers"] --> DB[("memory.sqlite<br/>FTS5 + vectors")]
   Core --> Files[("attachments/<br/>backups/")]
   Core -. optional .-> LLM["Your AI provider<br/>(Ollama, OpenAI, Anthropic…)"]
   Core -. optional .-> Sync[("Shared folder<br/>encrypted sync")]
@@ -152,4 +152,4 @@ Override it with `--home DIR` or `ENVE_MEMORY_HOME`.
 
 ## License
 
-[AGPL-3.0-only](LICENSE.md). Plugins and clients that talk to Enve Memory over MCP or its API are separate programs.
+[AGPL-3.0-only](LICENSE.md). Plugins and clients that talk to Petty Memory over MCP or its API are separate programs.

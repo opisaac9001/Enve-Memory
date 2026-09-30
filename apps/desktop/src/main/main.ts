@@ -25,7 +25,7 @@ const isMac = process.platform === 'darwin';
 
 // The library folder is the app's userData, as the CLI expects; Chromium's own state goes in a subfolder of it.
 mkdirSync(home, { recursive: true });
-app.setName('Enve Memory');
+app.setName('Petty Memory');
 app.setPath('userData', home);
 app.setPath('sessionData', join(home, 'Session'));
 
@@ -70,7 +70,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 860,
     minHeight: 560,
     show: false,
-    title: 'Enve Memory',
+    title: 'Petty Memory',
     backgroundColor: background(),
     ...(isMac ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 18, y: 18 } } : {}),
     webPreferences: webPreferences(),
@@ -194,7 +194,7 @@ function buildMenu(): void {
   const template: MenuItemConstructorOptions[] = [
     ...(isMac
       ? [{
-          label: 'Enve Memory',
+          label: 'Petty Memory',
           submenu: [
             { role: 'about' },
             { type: 'separator' },

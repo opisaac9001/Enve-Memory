@@ -51,13 +51,13 @@ Node refuses to strip types from files under `node_modules`, so anything that sh
 
 ## Data location
 
-`$ENVE_MEMORY_HOME`, or the platform default. The default is the same as Electron's `userData` for "Enve Memory", so the CLI and the desktop app share one library:
+`$ENVE_MEMORY_HOME`, or the platform default. The default is the same as Electron's `userData` for "Petty Memory", so the CLI and the desktop app share one library:
 
 - macOS: `~/Library/Application Support/Enve Memory/`
 - Windows: `%APPDATA%\Enve Memory\`
-- Linux: `$XDG_CONFIG_HOME/Enve Memory/` (default `~/.config/…`)
+- Linux: `$XDG_CONFIG_HOME/Petty Memory/` (default `~/.config/…`)
 
-The folder contains `memory.sqlite` (with `-wal`/`-shm` files), `attachments/` (content-addressed file blobs, plus `.trash/` for 30 days after deletion) and `backups/`. The embedding model lives in `models/` inside the OS cache folder (`~/Library/Caches/Enve Memory`, `%LOCALAPPDATA%\Enve Memory\Cache`, `$XDG_CACHE_HOME/enve-memory`; override with `$ENVE_MEMORY_CACHE`). It's shared by every library, never backed up, and re-downloads if cleared.
+The folder contains `memory.sqlite` (with `-wal`/`-shm` files), `attachments/` (content-addressed file blobs, plus `.trash/` for 30 days after deletion) and `backups/`. The embedding model lives in `models/` inside the OS cache folder (`~/Library/Caches/Petty Memory`, `%LOCALAPPDATA%\Petty Memory\Cache`, `$XDG_CACHE_HOME/enve-memory`; override with `$ENVE_MEMORY_CACHE`). It's shared by every library, never backed up, and re-downloads if cleared.
 
 ## Automations
 
@@ -65,9 +65,9 @@ The folder contains `memory.sqlite` (with `-wal`/`-shm` files), `attachments/` (
 
 ## Backups and export
 
-- **Snapshots:** `VACUUM INTO` copies taken while the library stays open. `runSchedule()` keeps 24 hourly, 30 daily and 12 monthly. The desktop app and `serve` call it every 10 minutes; `enve-memory backup` takes one on demand.
-- **Restore:** `enve-memory restore <file|latest> --yes` verifies the snapshot (integrity check, schema version, looks like a library), snapshots the current library first as `pre-restore-*` so the restore can be undone, swaps the file in, and brings back any attachments the snapshot needs from `.trash/`. Other processes must be closed first.
-- **Export Everything:** `enve-memory export <folder>` writes readable Markdown and the original files, plus a complete `metadata.json`:
+- **Snapshots:** `VACUUM INTO` copies taken while the library stays open. `runSchedule()` keeps 24 hourly, 30 daily and 12 monthly. The desktop app and `serve` call it every 10 minutes; `petty-memory backup` takes one on demand.
+- **Restore:** `petty-memory restore <file|latest> --yes` verifies the snapshot (integrity check, schema version, looks like a library), snapshots the current library first as `pre-restore-*` so the restore can be undone, swaps the file in, and brings back any attachments the snapshot needs from `.trash/`. Other processes must be closed first.
+- **Export Everything:** `petty-memory export <folder>` writes readable Markdown and the original files, plus a complete `metadata.json`:
   - per project: `README.md` (description, instructions, memory), `decisions.md`, `tasks.md` and `links.md`
   - `notes/` with YAML front matter
   - `archive/`: the saved page text
@@ -82,11 +82,11 @@ SQLite runs in WAL mode with a 5 s busy timeout. The desktop app, a CLI invocati
 - **Keyword:** SQLite FTS5 over `title`, `body`, `url` and `content`, with the porter stemmer and unicode61 tokenizer with diacritics removed. Ranking is bm25 with column weights 10 / 1.5 / 2 / 1. User text is tokenized, stopwords are dropped (unless they're the whole query), and every term is quoted so FTS syntax is inert. Terms are OR'd so partial matches still surface, and the last term is a prefix match.
 - **Meaning:** items are chunked (≈1000 characters, 200 overlap, at most 48 per item) and embedded by an `Embedder`. The default is `LocalEmbedder`: all-MiniLM-L6-v2 through transformers.js and onnxruntime-node, int8, about 23 MB, downloaded once into the cache folder (see [Data location](#data-location)). Vectors live in `chunks` as float32 blobs and are searched brute-force in memory. That's fast enough for a personal library, and it avoids depending on pre-1.0 sqlite-vec. A trigger marks an item stale whenever its text changes, and the in-memory index reloads when another process writes vectors.
 - **Hybrid:** reciprocal rank fusion (k = 60) of the two lists. Vector hits below the model's `minScore` (0.18 for MiniLM) are dropped, so an unrelated query returns nothing rather than the least-bad items. We chose MiniLM over bge-small because bge packs every score into 0.4–0.7, which makes a relevance floor impossible. `packages/embeddings/test/retrieval.test.ts` is the fixture eval: hybrid gets 5 of 6 paraphrased questions right at #1, keyword alone gets 1 of 6.
-- Semantic search is on by default (`semanticSearch` setting). `serve` and the desktop app index in the background; `enve-memory index` does it on demand.
+- Semantic search is on by default (`semanticSearch` setting). `serve` and the desktop app index in the background; `petty-memory index` does it on demand.
 
 ## Ingestion
 
-`save → (pending) → fetch or read file → extract → setSource(title if empty, content, metadata) → index`. Saving never waits on the network: the CLI and MCP `save_link` wait up to 10 s so the user or model sees the real title, the API returns at once and a background `IngestWorker` finishes the job, and failures are recorded on the item (`metadata.ingest.status = failed`) for `enve-memory ingest --retry`. The `fetchLinks` setting turns all fetching off. Deterministic steps never depend on AI. A bookmark keeps its URL plus cleaned Markdown (and optionally the original HTML), so it outlives the page. Capture clients such as the browser extension and the share sheet send only `{url, title, selection, note}`. Extraction always runs on the computer that holds the library.
+`save → (pending) → fetch or read file → extract → setSource(title if empty, content, metadata) → index`. Saving never waits on the network: the CLI and MCP `save_link` wait up to 10 s so the user or model sees the real title, the API returns at once and a background `IngestWorker` finishes the job, and failures are recorded on the item (`metadata.ingest.status = failed`) for `petty-memory ingest --retry`. The `fetchLinks` setting turns all fetching off. Deterministic steps never depend on AI. A bookmark keeps its URL plus cleaned Markdown (and optionally the original HTML), so it outlives the page. Capture clients such as the browser extension and the share sheet send only `{url, title, selection, note}`. Extraction always runs on the computer that holds the library.
 
 ## AI providers (`packages/ai`)
 

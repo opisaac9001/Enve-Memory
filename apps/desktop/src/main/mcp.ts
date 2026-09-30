@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import type { McpSetup } from '../shared/ipc.ts';
 
-export const SERVER_NAME = 'enve-memory';
+export const SERVER_NAME = 'petty-memory';
 
 export interface LaunchContext {
   isPackaged: boolean;

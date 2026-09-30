@@ -45,7 +45,7 @@ const page = ({ width, height, title, tagline, compact }) => `<!doctype html>
 <body>
   <div class="glow"></div>
   <div class="copy">
-    <div class="brand"><img src="${logo}" alt=""><span>Enve Memory</span></div>
+    <div class="brand"><img src="${logo}" alt=""><span>Petty Memory</span></div>
     <h1>${title}</h1>
     <p>${tagline}</p>
     ${compact ? '' : '<div class="chips"><span>Claude · Codex · ChatGPT · any MCP client</span><span>Local-first</span><span>Semantic search</span><span>Desktop · Browser · iOS</span></div>'}

@@ -1,6 +1,6 @@
 export const DEFAULT_SERVER_URL = 'http://127.0.0.1:49231';
-export const TOKEN_COMMAND = 'enve-memory clients add "Browser" --scope read,capture';
-export const SERVE_COMMAND = 'enve-memory serve';
+export const TOKEN_COMMAND = 'petty-memory clients add "Browser" --scope read,capture';
+export const SERVE_COMMAND = 'petty-memory serve';
 
 export const INTENTS = ['read', 'watch', 'buy', 'revisit'];
 
@@ -108,32 +108,32 @@ export function describeError(error, serverUrl = DEFAULT_SERVER_URL) {
   if (!(error instanceof ApiError)) return 'Something went wrong. Try again.';
   switch (error.code) {
     case 'offline':
-      return `Can't reach Enve Memory at ${serverUrl}. Start Enve Memory or run \`${SERVE_COMMAND}\`.`;
+      return `Can't reach Petty Memory at ${serverUrl}. Start Petty Memory or run \`${SERVE_COMMAND}\`.`;
     case 'timeout':
-      return `Enve Memory at ${serverUrl} didn't answer in time. Check that it's running.`;
+      return `Petty Memory at ${serverUrl} didn't answer in time. Check that it's running.`;
     case 'not_enve':
-      return `Something other than Enve Memory is answering at ${serverUrl}. Check the server URL.`;
+      return `Something other tha Petty Memory is answering at ${serverUrl}. Check the server URL.`;
     case 'unauthorized':
       return `The token was rejected. Create one with \`${TOKEN_COMMAND}\` and paste it in Settings.`;
     case 'insufficient_scope':
       return `${error.message} Create a token with \`${TOKEN_COMMAND}\`.`;
     case 'forbidden_host':
-      return `Enve Memory only accepts localhost connections. To connect from another address, run \`${SERVE_COMMAND} --lan\`.`;
+      return `Petty Memory only accepts localhost connections. To connect from another address, run \`${SERVE_COMMAND} --lan\`.`;
     case 'forbidden_origin':
-      return 'Enve Memory refused this browser extension. Update Enve Memory and try again.';
+      return 'Petty Memory refused this browser extension. Update Petty Memory and try again.';
     case 'too_large':
       return 'That is too much to save at once. Try a shorter selection.';
     case 'locked':
-      return 'Enve Memory is busy with an import or restore. Try again in a moment.';
+      return 'Petty Memory is busy with an import or restore. Try again in a moment.';
     case 'in_progress':
-      return 'Enve Memory is still handling this save. Try again in a moment.';
+      return 'Petty Memory is still handling this save. Try again in a moment.';
     case 'invalid':
     case 'not_found':
     case 'conflict':
       return error.message;
     default:
       return error.status >= 500
-        ? 'Enve Memory hit an internal error. Try again, and check its logs if it keeps happening.'
+        ? 'Petty Memory hit an internal error. Try again, and check its logs if it keeps happening.'
         : error.message;
   }
 }
@@ -171,7 +171,7 @@ export function createClient({ serverUrl, token, fetch = globalThis.fetch, timeo
       const data = await request('GET', '/status', { auth: false }).catch((error) => {
         throw error.code === 'bad_response' ? new ApiError('not_enve', error.message, error.status) : error;
       });
-      if (data?.name !== 'enve-memory') throw new ApiError('not_enve', 'Not an Enve Memory server.');
+      if (data?.name !== 'enve-memory') throw new ApiError('not_enve', 'Not a Petty Memory server.');
       return data;
     },
     whoami: () => request('GET', '/whoami'),

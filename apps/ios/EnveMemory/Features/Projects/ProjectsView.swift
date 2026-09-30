@@ -15,7 +15,7 @@ struct ProjectsView: View {
             if let error { ErrorBanner(message: error) { Task { await load() } } }
             if store.projects.isEmpty, loaded, error == nil {
                 EmptyStateView(symbol: "folder", title: "No projects yet",
-                               message: "Create one on your computer with `enve-memory project new`, or let your AI do it.")
+                               message: "Create one on your computer with `petty-memory project new`, or let your AI do it.")
             }
             ForEach(store.projects) { project in
                 Button { router.open(.project(project.id)) } label: { ProjectCard(project: project) }

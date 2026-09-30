@@ -222,7 +222,7 @@ async function act(change) {
   $('page-error').hidden = true;
   try {
     const result = await change();
-    if (result?.queued) return flashStatus('Saved offline. It will sync when Enve Memory is back.');
+    if (result?.queued) return flashStatus('Saved offline. It will sync when Petty Memory is back.');
     item = result?.item ?? result;
     renderPage();
     void showShelf(shelf);
@@ -259,7 +259,7 @@ async function savePage() {
     $('page-note').value = '';
     tags.clear();
     dirty = false;
-    if (result.queued) return flashStatus('Saved offline. It will sync when Enve Memory is back.');
+    if (result.queued) return flashStatus('Saved offline. It will sync when Petty Memory is back.');
     item = result.item;
     renderPage();
     flashStatus(result.created ? 'Saved' : 'Updated');

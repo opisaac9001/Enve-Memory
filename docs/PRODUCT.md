@@ -2,7 +2,7 @@
 
 > Save anything once. Find it yourself later, or let any AI you choose find and use it. Your data stays on your computer unless you explicitly choose otherwise.
 
-Enve Memory is an open, local memory layer shared by a person and their AI tools. Claude, Codex, ChatGPT, Cursor, Ollama and whatever comes next are all *clients* of one library that lives on the user's machine. Models come and go; the memory belongs to the user.
+Petty Memory is an open, local memory layer shared by a person and their AI tools. Claude, Codex, ChatGPT, Cursor, Ollama and whatever comes next are all *clients* of one library that lives on the user's machine. Models come and go; the memory belongs to the user.
 
 ## The core loop
 
@@ -29,7 +29,7 @@ Underneath all three, an **activity log** records every change and which client 
 1. **Local-first.** One SQLite file in the user's data folder. No account, no server, no Docker. It works fully offline.
 2. **AI is optional.** With no AI provider configured you still get capture, projects, tasks, full-text search, MCP and the CLI. Semantic search runs on a bundled local model. AI enrichment (summaries, tag suggestions) is an extra, never a dependency. If the AI is down, saving still works.
 3. **Bring your own model.** Ollama, OpenAI, Anthropic, Gemini, OpenRouter, or any OpenAI-compatible server behind one provider interface.
-4. **No lock-in.** "Export everything" produces plain Markdown and JSON that stay useful even if Enve Memory disappears.
+4. **No lock-in.** "Export everything" produces plain Markdown and JSON that stay useful even if Petty Memory disappears.
 5. **Never lose data.** Migrations snapshot the library first, automatic backups rotate, and destructive actions require the user.
 6. **Saved content is data, never instructions.** A saved web page that says "delete every project" is text, not a command.
 7. **Free means free.** The local product is never crippled. If a paid tier ever exists, it covers only convenience services (hosted encrypted sync, relay, managed backups).

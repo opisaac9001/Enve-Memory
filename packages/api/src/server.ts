@@ -195,7 +195,7 @@ function checkOrigin(req: IncomingMessage, lan: boolean): string | undefined {
   }
   const loopbackPage = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && LOOPBACK_HOSTS.has(parsed.hostname === '::1' ? '[::1]' : parsed.hostname);
   if (!EXTENSION_PROTOCOLS.has(parsed.protocol) && !loopbackPage) {
-    throw new HttpError(403, 'forbidden_origin', 'Web pages cannot call the Enve Memory API.');
+    throw new HttpError(403, 'forbidden_origin', 'Web pages cannot call the Petty Memory API.');
   }
   return origin;
 }
@@ -204,7 +204,7 @@ function authenticate(memory: EnveMemory, req: IncomingMessage): ApiClient {
   const header = req.headers.authorization ?? '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   const client = token ? memory.clients.authenticate(token) : null;
-  if (!client) throw new HttpError(401, 'unauthorized', 'A valid bearer token is required. Create one with `enve-memory clients add`.');
+  if (!client) throw new HttpError(401, 'unauthorized', 'A valid bearer token is required. Create one with `petty-memory clients add`.');
   return client;
 }
 

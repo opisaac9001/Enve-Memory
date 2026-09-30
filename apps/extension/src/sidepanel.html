@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="color-scheme" content="dark light">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Enve Memory</title>
+  <title>Petty Memory</title>
   <link rel="stylesheet" href="base.css">
   <link rel="stylesheet" href="components.css">
   <link rel="stylesheet" href="sidepanel.css">
@@ -12,16 +12,16 @@
 </head>
 <body>
   <header class="bar">
-    <span class="brand"><img src="icons/icon-32.png" alt="" width="20" height="20">Enve Memory</span>
+    <span class="brand"><img src="icons/icon-32.png" alt="" width="20" height="20">Petty Memory</span>
     <button type="button" class="icon-button" id="open-settings" title="Settings" aria-label="Settings">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
     </button>
   </header>
 
   <section id="setup" class="card" hidden>
-    <h1>Connect to Enve Memory</h1>
+    <h1>Connect to Petty Memory</h1>
     <p>Add an access token in Settings to start saving pages. Create one in a terminal:</p>
-    <code class="command">enve-memory clients add "Browser" --scope read,capture</code>
+    <code class="command">petty-memory clients add "Browser" --scope read,capture</code>
     <button type="button" class="button primary" id="setup-open">Open Settings</button>
   </section>
 
@@ -38,7 +38,7 @@
       <h2 id="page-heading" class="section-title">This page</h2>
 
       <div id="page-access" class="card compact" hidden>
-        <p>Let Enve Memory see which page you're on so this panel can follow along as you switch tabs. Addresses are only sent to your own Enve Memory.</p>
+        <p>Let Petty Memory see which page you're on so this panel can follow along as you switch tabs. Addresses are only sent to your own Petty Memory.</p>
         <button type="button" class="button primary small" id="grant-tabs">Allow</button>
       </div>
       <p id="page-unsupported" class="muted" hidden>This page can't be saved. Open a web page to save it here.</p>

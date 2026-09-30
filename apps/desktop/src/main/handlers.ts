@@ -120,7 +120,7 @@ export function createHandlers(ctx: HandlerContext): Handlers {
     bookmarks: { title: 'Choose a bookmarks file exported from your browser', properties: ['openFile'], filters: [{ name: 'Bookmarks', extensions: ['html', 'htm'] }] },
     markdown: { title: 'Choose a folder of Markdown notes', properties: ['openDirectory'] },
     csv: { title: 'Choose a CSV file', properties: ['openFile'], filters: [{ name: 'CSV', extensions: ['csv'] }] },
-    enve: { title: 'Choose an Enve Memory export folder', properties: ['openDirectory'] },
+    enve: { title: 'Choose a Petty Memory export folder', properties: ['openDirectory'] },
   };
 
   return {
@@ -342,7 +342,7 @@ export function createHandlers(ctx: HandlerContext): Handlers {
       const folder = await pick({ title: 'Choose where to export', properties: ['openDirectory', 'createDirectory'] });
       if (!folder) return null;
       const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '.');
-      const summary = memory().exports.write(join(folder, `Enve Memory Export ${stamp}`));
+      const summary = memory().exports.write(join(folder, `Petty Memory Export ${stamp}`));
       shell.showItemInFolder(summary.path);
       return summary;
     },

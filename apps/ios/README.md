@@ -1,6 +1,6 @@
-# Enve Memory for iOS
+# Petty Memory for iOS
 
-The phone companion for Enve Memory. The library stays on your computer; the phone is a client of the local HTTP API (`enve-memory serve --lan`) over your home network or Tailscale. It keeps only its pairing token (Keychain) and an outbox of captures that couldn't be sent yet.
+The phone companion for Petty Memory. The library stays on your computer; the phone is a client of the local HTTP API (`petty-memory serve --lan`) over your home network or Tailscale. It keeps only its pairing token (Keychain) and an outbox of captures that couldn't be sent yet.
 
 | Home | Project briefing | Item detail |
 |---|---|---|
@@ -20,7 +20,7 @@ Screenshots use the fictional demo library from `node scripts/demo-library.ts <e
 
 - Xcode 26 or newer, iOS 17.0+ deployment target, Swift 6 language mode.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen). The `.xcodeproj` is generated from `project.yml`; run `xcodegen generate` after adding files or changing `project.yml`.
-- An Enve Memory server: `enve-memory serve --lan` on the computer that holds the library.
+- A Petty Memory server: `petty-memory serve --lan` on the computer that holds the library.
 
 ## Build and run
 
@@ -38,8 +38,8 @@ To run on a device, set `DEVELOPMENT_TEAM` in `project.yml` (both targets share 
 On the computer:
 
 ```bash
-enve-memory serve --lan
-enve-memory clients pair "My iPhone"      # prints enve-memory://pair?url=…&token=…&name=… links, one per network address
+petty-memory serve --lan
+petty-memory clients pair "My iPhone"      # prints enve-memory://pair?url=…&token=…&name=… links, one per network address
 ```
 
 Then on the phone, either:
@@ -49,13 +49,13 @@ Then on the phone, either:
 - **Paste** the link on the onboarding screen, or
 - **Enter** the server address (`http://192.168.1.20:49231`) and the `em_…` token by hand.
 
-Nothing is stored until `GET /status` and `GET /whoami` both succeed. Settings shows the address, device name, server version and granted scopes. Unpairing deletes the token from the phone; revoke it on the computer with `enve-memory clients revoke <id>`.
+Nothing is stored until `GET /status` and `GET /whoami` both succeed. Settings shows the address, device name, server version and granted scopes. Unpairing deletes the token from the phone; revoke it on the computer with `petty-memory clients revoke <id>`.
 
 For the simulator, which shares the Mac's network, a loopback link works without `--lan`:
 
 ```bash
-enve-memory --home /tmp/em serve --port 49871
-enve-memory --home /tmp/em clients pair "iPhone Sim" --port 49871 --json   # take the token from the output
+petty-memory --home /tmp/em serve --port 49871
+petty-memory --home /tmp/em clients pair "iPhone Sim" --port 49871 --json   # take the token from the output
 xcrun simctl openurl <udid> "enve-memory://pair?url=http%3A%2F%2F127.0.0.1%3A49871&token=<token>&name=iPhone+Sim"
 ```
 
@@ -120,4 +120,4 @@ cd apps/ios && xcodebuild test -project EnveMemory.xcodeproj -scheme EnveMemory 
 
 (`xcrun swift` avoids a stale toolchain that `swiftly` may put first on `PATH`.)
 
-They cover the new item fields (tags, intent, pin, opened, reminder, AI suggestions, search previews), shelf queries, reminder presets (including a daylight-saving change), the pure reminder plan (what to schedule, replace and cancel given the server's list, capped at 60 because iOS keeps 64 pending), item deep links, idempotency keys (fresh per write, kept across a lost response and the outbox retry), paging parameters and cursors, pairing-link parsing (valid, invalid and missing fields, `+` as space), request building (paths, strict query and header percent-encoding, bodies), error mapping through a `URLProtocol` stub (envelope codes, non-envelope statuses, connection failures, decoding), the outbox (persistence, ordering, concurrent flushes, backoff schedule, permanent failures, file uploads, removal), JSON decoding of responses captured from a real `enve-memory serve` 0.1.0 (`Tests/EnveMemoryKitTests/Fixtures`), and the share extension's item-provider → payload conversion.
+They cover the new item fields (tags, intent, pin, opened, reminder, AI suggestions, search previews), shelf queries, reminder presets (including a daylight-saving change), the pure reminder plan (what to schedule, replace and cancel given the server's list, capped at 60 because iOS keeps 64 pending), item deep links, idempotency keys (fresh per write, kept across a lost response and the outbox retry), paging parameters and cursors, pairing-link parsing (valid, invalid and missing fields, `+` as space), request building (paths, strict query and header percent-encoding, bodies), error mapping through a `URLProtocol` stub (envelope codes, non-envelope statuses, connection failures, decoding), the outbox (persistence, ordering, concurrent flushes, backoff schedule, permanent failures, file uploads, removal), JSON decoding of responses captured from a real `petty-memory serve` 0.1.0 (`Tests/EnveMemoryKitTests/Fixtures`), and the share extension's item-provider → payload conversion.

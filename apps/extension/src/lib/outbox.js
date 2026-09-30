@@ -66,7 +66,7 @@ export function flushOutbox(client, serverUrl) {
 }
 
 /**
- * Sends a capture now, or queues it when Enve Memory can't be reached. The key sent now is the key reused on retry, so
+ * Sends a capture now, or queues it when Petty Memory can't be reached. The key sent now is the key reused on retry, so
  * a save that landed just before the connection dropped isn't duplicated.
  */
 export async function saveCapture(client, payload, serverUrl) {

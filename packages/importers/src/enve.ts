@@ -13,14 +13,14 @@ interface ExportFile {
 }
 
 /**
- * Restores an Enve Memory export (`enve-memory export`) into this library, keeping ids and dates, so moving to a
+ * Restores a Petty Memory export (`petty-memory export`) into this library, keeping ids and dates, so moving to a
  * new computer or recovering from an export loses nothing. Anything already present (same id) is left alone.
  */
 export function importEnveExport(memory: EnveMemory, dir: string): ImportResult {
   const path = join(dir, 'metadata.json');
-  if (!existsSync(path)) throw new Error(`${dir} has no metadata.json; is it an Enve Memory export folder?`);
+  if (!existsSync(path)) throw new Error(`${dir} has no metadata.json; is it a Petty Memory export folder?`);
   const data = JSON.parse(readFileSync(path, 'utf8')) as ExportFile;
-  if (data.format !== EXPORT_FORMAT) throw new Error(`${path} is not an Enve Memory export.`);
+  if (data.format !== EXPORT_FORMAT) throw new Error(`${path} is not a Petty Memory export.`);
   const result = emptyResult();
   const files = indexFiles(dir);
 

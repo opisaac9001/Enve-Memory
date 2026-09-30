@@ -17,7 +17,7 @@ public struct Pairing: Codable, Hashable, Sendable {
     }
 }
 
-/// `enve-memory://pair?url=<base>&token=em_…&name=<device>`, as printed by `enve-memory clients pair`.
+/// `enve-memory://pair?url=<base>&token=em_…&name=<device>`, as printed by `petty-memory clients pair`.
 public struct PairingLink: Hashable, Sendable {
     public let baseURL: URL
     public let token: String
@@ -38,11 +38,11 @@ public struct PairingLink: Hashable, Sendable {
 
         public var errorDescription: String? {
             switch self {
-            case .notAPairingLink: "That isn't an Enve Memory pairing link. It should start with enve-memory://pair."
+            case .notAPairingLink: "That isn't a Petty Memory pairing link. It should start with enve-memory://pair."
             case .missingURL: "The pairing link has no server address."
             case .invalidURL: "The server address in the pairing link must be an http:// or https:// URL."
             case .missingToken: "The pairing link has no token."
-            case .invalidToken: "The token must start with em_. Create a new link with `enve-memory clients pair`."
+            case .invalidToken: "The token must start with em_. Create a new link with `petty-memory clients pair`."
             }
         }
     }

@@ -49,7 +49,7 @@ targets:
     info:
       path: EnveMemory/Info.plist
       properties:
-        CFBundleDisplayName: Enve Memory
+        CFBundleDisplayName: Petty Memory
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ITSAppUsesNonExemptEncryption: false
@@ -66,8 +66,8 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
-        NSLocalNetworkUsageDescription: Enve Memory connects to the library on your computer over your home network.
-        NSCameraUsageDescription: Scan the pairing QR code shown by Enve Memory on your computer.
+        NSLocalNetworkUsageDescription: Petty Memory connects to the library on your computer over your home network.
+        NSCameraUsageDescription: Scan the pairing QR code shown by Petty Memory on your computer.
         CFBundleURLTypes:
           - CFBundleURLName: com.enve.memory
             CFBundleTypeRole: Viewer
@@ -99,12 +99,12 @@ targets:
     info:
       path: EnveMemoryShare/Info.plist
       properties:
-        CFBundleDisplayName: Enve Memory
+        CFBundleDisplayName: Petty Memory
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
-        NSLocalNetworkUsageDescription: Enve Memory connects to the library on your computer over your home network.
+        NSLocalNetworkUsageDescription: Petty Memory connects to the library on your computer over your home network.
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController

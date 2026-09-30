@@ -20,7 +20,7 @@ export async function quickSave(kind, info, tab) {
     const payload = buildCapturePayload({ ...(await captureFields(kind, info, tab)), project: settings.lastProject?.id });
     const result = await saveCapture(client, payload, settings.serverUrl);
     await flashBadge(tab?.id, '✓', OK_COLOR);
-    if (result.queued) notify('Saved offline', `${payload.title || payload.url || 'Note'} will sync when Enve Memory is back.`);
+    if (result.queued) notify('Saved offline', `${payload.title || payload.url || 'Note'} will sync when Petty Memory is back.`);
     else notify(result.created ? 'Saved' : 'Updated', `${result.item.title || result.item.url || 'Note'} · ${result.item.project?.name ?? 'Inbox'}`);
   } catch (error) {
     await flashBadge(tab?.id, '!', ERROR_COLOR);

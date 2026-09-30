@@ -38,8 +38,8 @@ async function representativeValues() {
   const lanUrls = [`http://192.168.1.20:${port}`, `http://100.101.12.7:${port}`];
   const launch = mcpLaunch({
     isPackaged: true,
-    execPath: '/Applications/Enve Memory.app/Contents/MacOS/Enve Memory',
-    resourcesPath: '/Applications/Enve Memory.app/Contents/Resources',
+    execPath: '/Applications/Petty Memory.app/Contents/MacOS/Petty Memory',
+    resourcesPath: '/Applications/Petty Memory.app/Contents/Resources',
     repoRoot: '',
     home: null,
   });

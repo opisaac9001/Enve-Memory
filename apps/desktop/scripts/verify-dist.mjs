@@ -1,5 +1,5 @@
 // Smoke-tests a packaged macOS app against a throwaway library:
-//   node scripts/verify-dist.mjs ["/path/to/Enve Memory.app"]
+//   node scripts/verify-dist.mjs ["/path/to/Petty Memory.app"]
 // 1. the bundled CLI runs under the app's own runtime (ELECTRON_RUN_AS_NODE) and serves MCP over stdio,
 // 2. the app starts, answers /api/v1/status on a free port, and quits cleanly,
 // 3. keyword search works from the packaged CLI; if the embedding model is already cached and the build has the runtime,
@@ -14,8 +14,8 @@ import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { root } from './bundle.mjs';
 
-const app = resolve(process.argv[2] ?? join(root, 'release', 'mac-arm64', 'Enve Memory.app'));
-const executable = join(app, 'Contents', 'MacOS', 'Enve Memory');
+const app = resolve(process.argv[2] ?? join(root, 'release', 'mac-arm64', 'Petty Memory.app'));
+const executable = join(app, 'Contents', 'MacOS', 'Petty Memory');
 const cli = join(app, 'Contents', 'Resources', 'cli.mjs');
 const home = mkdtempSync(join(tmpdir(), 'enve-dist-'));
 // Intel builds ship without onnxruntime-node (it has no darwin-x64 binary); they must degrade to keyword search.

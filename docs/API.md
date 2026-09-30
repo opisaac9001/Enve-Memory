@@ -1,10 +1,10 @@
 # Local HTTP API
 
-Served by the desktop app or `enve-memory serve` at `http://127.0.0.1:49231` (add `--lan` to reach it from other devices). Implementation: [`packages/api/src`](../packages/api/src). The security model is in [SECURITY.md](SECURITY.md).
+Served by the desktop app or `petty-memory serve` at `http://127.0.0.1:49231` (add `--lan` to reach it from other devices). Implementation: [`packages/api/src`](../packages/api/src). The security model is in [SECURITY.md](SECURITY.md).
 
 ## Authentication
 
-Create a token with `enve-memory clients add "<name>" --scope read,capture` (or in Settings → Devices), or pair a phone with `enve-memory clients pair "<device>"`. Send it as `Authorization: Bearer em_…`.
+Create a token with `petty-memory clients add "<name>" --scope read,capture` (or in Settings → Devices), or pair a phone with `petty-memory clients pair "<device>"`. Send it as `Authorization: Bearer em_…`.
 
 | Scope | Allows |
 |---|---|
@@ -64,4 +64,4 @@ Nothing is deleted over HTTP. Links saved through the API are fetched and archiv
 
 ## Pairing links
 
-`enve-memory://pair?url=<base URL>&token=<token>&name=<device name>`: shown as a QR code by the desktop app and printed by `enve-memory clients pair`.
+`enve-memory://pair?url=<base URL>&token=<token>&name=<device name>`: shown as a QR code by the desktop app and printed by `petty-memory clients pair`.

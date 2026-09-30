@@ -26,7 +26,7 @@ struct PairingForm: View {
     }
 
     var body: some View {
-        HearthScreen(title: isReplacing ? "Pair again" : "Connect your library", overline: "Enve Memory") {
+        HearthScreen(title: isReplacing ? "Pair again" : "Connect your library", overline: "Petty Memory") {
             intro
             if scannerAvailable { scanCard }
             linkCard
@@ -51,7 +51,7 @@ struct PairingForm: View {
             Text("On the computer, run:")
                 .font(HearthFont.footnote)
                 .foregroundStyle(hearth.textSecondary)
-            Text("enve-memory serve --lan\nenve-memory clients pair \"iPhone\"")
+            Text("petty-memory serve --lan\npetty-memory clients pair \"iPhone\"")
                 .font(HearthFont.monospace)
                 .textSelection(.enabled)
                 .padding(HearthSpacing.md)

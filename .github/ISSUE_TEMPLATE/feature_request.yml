@@ -1,5 +1,5 @@
 name: Feature request
-description: An idea that would make Enve Memory more useful.
+description: An idea that would make Petty Memory more useful.
 labels: [enhancement]
 body:
   - type: textarea

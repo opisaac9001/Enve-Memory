@@ -17,13 +17,13 @@ function serve(home, port) {
       const match = /listening on (http:\/\/\S+)/.exec(output);
       if (match) resolve(match[1]);
     });
-    server.once('exit', (code) => reject(new Error(`enve-memory serve exited with ${code}:\n${output}`)));
+    server.once('exit', (code) => reject(new Error(`petty-memory serve exited with ${code}:\n${output}`)));
   });
   return { server, url };
 }
 
 /**
- * Runs a real `enve-memory serve` against a throwaway library, with fetching and indexing off. `pause()` stops the
+ * Runs a real `petty-memory serve` against a throwaway library, with fetching and indexing off. `pause()` stops the
  * process and `resume()` starts it again on the same port and library, for offline tests.
  */
 export async function startScratchServer() {

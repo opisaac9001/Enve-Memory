@@ -21,7 +21,7 @@ public enum APIError: Error, Hashable, Sendable {
     case unreachable(URLError.Code)
     /// The server answered with `{error:{code,message}}`.
     case server(status: Int, code: APIErrorCode, message: String)
-    /// A non-2xx response without the API's error envelope (a proxy, or not an Enve Memory server).
+    /// A non-2xx response without the API's error envelope (a proxy, or not a Petty Memory server).
     case unexpectedResponse(status: Int)
     case decoding(String)
 
@@ -46,17 +46,17 @@ extension APIError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .unreachable(.timedOut):
-            "Your Enve Memory server didn't answer in time."
+            "Your Petty Memory server didn't answer in time."
         case .unreachable:
-            "Can't reach your Enve Memory server. Make sure it's running and you're on the same network or Tailscale."
+            "Can't reach your Petty Memory server. Make sure it's running and you're on the same network or Tailscale."
         case .server(_, .forbiddenHost, _):
-            "The server only accepts local connections. Start it with `enve-memory serve --lan`."
+            "The server only accepts local connections. Start it with `petty-memory serve --lan`."
         case .server(_, .unauthorized, _):
             "This phone's pairing is no longer valid. Pair again from your computer."
         case .server(_, _, let message):
             message
         case .unexpectedResponse(let status):
-            "The server answered with HTTP \(status). Is this an Enve Memory server?"
+            "The server answered with HTTP \(status). Is this a Petty Memory server?"
         case .decoding:
             "The server sent a response this version of the app doesn't understand."
         }

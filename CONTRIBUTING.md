@@ -1,6 +1,6 @@
-# Contributing to Enve Memory
+# Contributing to Petty Memory
 
-Thanks for helping. Enve Memory is a local-first memory layer shared by a person and their AI tools, so the bar is simple: **never lose data, never phone home, and keep it useful without AI.**
+Thanks for helping. Petty Memory is a local-first memory layer shared by a person and their AI tools, so the bar is simple: **never lose data, never phone home, and keep it useful without AI.**
 
 ## Setup
 
@@ -31,7 +31,7 @@ Node runs the TypeScript sources directly (type stripping), so the engine has no
 - `packages/ai`: optional LLM providers, enrichment and cited answers.
 - `packages/api`: the local HTTP API and MCP over HTTP (tokens, scopes, Host/Origin guards).
 - `packages/importers`: browser bookmarks, Markdown folders, CSV and Enve exports.
-- `packages/cli`: the `enve-memory` binary.
+- `packages/cli`: the `petty-memory` binary.
 - `apps/desktop`, `apps/extension`, `apps/ios`: the apps. Each has its own README.
 
 Before designing a change, read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DATA_MODEL.md](docs/DATA_MODEL.md), plus [docs/MCP.md](docs/MCP.md), [docs/SECURITY.md](docs/SECURITY.md) or [docs/SYNC.md](docs/SYNC.md) if your change touches them.

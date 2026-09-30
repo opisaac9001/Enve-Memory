@@ -79,7 +79,7 @@ async function loadLibrary(bookmarkable) {
     ]);
     fillProjects(projects);
     scopes = me?.scopes ?? [];
-    if (offline) showError(error, 'Offline: saves will sync when Enve Memory is back.');
+    if (offline) showError(error, 'Offline: saves will sync when Petty Memory is back.');
     if (item) showExisting(item);
   } catch (error) {
     showError(error);
@@ -169,7 +169,7 @@ async function save() {
   try {
     const result = await saveCapture(client, payload, settings.serverUrl);
     if (!existing?.project) await saveSettings({ lastProject: project ? { id: project, name: select.selectedOptions[0].text } : null });
-    if (result.queued) return showDone('Saved offline', 'It will sync when Enve Memory is back.');
+    if (result.queued) return showDone('Saved offline', 'It will sync when Petty Memory is back.');
     let { item } = result;
     if (existing?.intent && !intent.value && canWrite()) item = await client.setIntent(item.id, null);
     showDone(result.created ? 'Saved' : 'Updated', [item.project?.name ?? 'Inbox', ...item.tags.map((t) => `#${t}`)].join(' · '));

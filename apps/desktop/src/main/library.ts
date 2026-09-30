@@ -169,7 +169,7 @@ export class Library {
       this.apiStatus = {
         running: false, url: null, port: this.options.port, lan, lanUrls: [],
         error: inUse
-          ? `Port ${this.options.port} is already in use, probably by another Enve Memory or \`enve-memory serve\`. Everything else works; the browser extension and phone can’t connect to this app until the port is free.`
+          ? `Port ${this.options.port} is already in use, probably by another Petty Memory or \`petty-memory serve\`. Everything else works; the browser extension and phone can’t connect to this app until the port is free.`
           : (error as Error).message,
       };
     }

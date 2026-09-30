@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import EnveMemoryKit
 
-/// Every fixture is a real response captured from `enve-memory serve` 0.1.0.
+/// Every fixture is a real response captured from `petty-memory serve` 0.1.0.
 @Suite struct DecodingTests {
     func decode<T: Decodable>(_ type: T.Type, _ fixture: String) throws -> T {
         try JSONCoding.makeDecoder().decode(T.self, from: Fixture.data(fixture))

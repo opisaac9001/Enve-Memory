@@ -47,7 +47,7 @@ struct ShareView: View {
                 .padding(HearthSpacing.lg)
             }
             .background(hearth.background.ignoresSafeArea())
-            .navigationTitle("Enve Memory")
+            .navigationTitle("Petty Memory")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

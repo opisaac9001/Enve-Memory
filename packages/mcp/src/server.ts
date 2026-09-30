@@ -10,9 +10,9 @@ import {
 } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
-export const SERVER_NAME = 'enve-memory';
+export const SERVER_NAME = 'petty-memory';
 
-const INSTRUCTIONS = `Enve Memory is the user's personal, local knowledge base, shared across every AI tool they use. Links, notes, tasks, projects and decisions saved here by one assistant are visible to the others.
+const INSTRUCTIONS = `Petty Memory is the user's personal, local knowledge base, shared across every AI tool they use. Links, notes, tasks, projects and decisions saved here by one assistant are visible to the others.
 
 - When the user mentions a project, call get_project first. It returns the project's instructions, its memory document, the decision log, open tasks and recent material in one call.
 - Search before saving, so you don't create duplicates.

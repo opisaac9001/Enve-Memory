@@ -103,7 +103,7 @@ async function serve(home) {
       const match = /listening on (http:\/\/\S+)/.exec(output);
       if (match) resolve(match[1]);
     });
-    server.once('exit', (code) => reject(new Error(`enve-memory serve exited with ${code}:\n${output}`)));
+    server.once('exit', (code) => reject(new Error(`petty-memory serve exited with ${code}:\n${output}`)));
   });
   return { server, url };
 }

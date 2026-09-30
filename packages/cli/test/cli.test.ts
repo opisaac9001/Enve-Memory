@@ -70,7 +70,7 @@ test('export, snapshot and restore round-trip from the command line', () => {
 
   const out = join(home, 'out');
   assert.equal(json(home, ['export', out]).items, 1);
-  assert.match(readFileSync(join(out, 'README.md'), 'utf8'), /Enve Memory export/);
+  assert.match(readFileSync(join(out, 'README.md'), 'utf8'), /Petty Memory export/);
 });
 
 test('AI is off until a provider is chosen, and misconfiguration is explained', () => {
@@ -155,8 +155,8 @@ test('errors are reported with distinct exit codes', () => {
 
 test('connect prints a working command for each client', () => {
   const { stdout } = cli(tempHome(), ['connect']);
-  assert.match(stdout, /claude mcp add --scope user enve-memory -- /);
-  assert.match(stdout, /\[mcp_servers\.enve-memory\]/);
+  assert.match(stdout, /claude mcp add --scope user petty-memory -- /);
+  assert.match(stdout, /\[mcp_servers\.petty-memory\]/);
   assert.ok(stdout.includes(JSON.stringify(MAIN)));
 });
 

@@ -37,7 +37,7 @@ export function Home({ capture }: { capture: CaptureRequest }) {
         <section className="welcome" aria-label="Getting started">
           <h2>Save a link, jot a note, or connect Claude Code.</h2>
           <p>
-            Enve Memory is one library on this computer that you and your AI tools share. What you save here, Claude Code,
+            Petty Memory is one library on this computer that you and your AI tools share. What you save here, Claude Code,
             Codex and other assistants can search and build on, and what they record shows up here.
           </p>
           <div className="welcome-steps">
@@ -54,7 +54,7 @@ export function Home({ capture }: { capture: CaptureRequest }) {
             <div>
               <Icon name="sparkle" />
               <h3>Connect</h3>
-              <p>Add Enve Memory to Claude Code, Codex or Cursor once, and they all share the same memory.</p>
+              <p>Add Petty Memory to Claude Code, Codex or Cursor once, and they all share the same memory.</p>
               <button className="button small" onClick={() => go({ view: 'settings', section: 'mcp' })}>Connect AI tools</button>
             </div>
           </div>

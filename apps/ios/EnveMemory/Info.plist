@@ -9,7 +9,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Enve Memory</string>
+	<string>Petty Memory</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,9 +45,9 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Scan the pairing QR code shown by Enve Memory on your computer.</string>
+	<string>Scan the pairing QR code shown by Petty Memory on your computer.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Enve Memory connects to the library on your computer over your home network.</string>
+	<string>Petty Memory connects to the library on your computer over your home network.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

@@ -102,7 +102,7 @@ export class BackupService {
   }
 }
 
-/** Checks a snapshot is a sound Enve Memory library this build can open. */
+/** Checks a snapshot is a sound Petty Memory library this build can open. */
 export function verifyBackup(path: string): { schemaVersion: number } {
   let db: DatabaseSync;
   try {
@@ -120,9 +120,9 @@ export function verifyBackup(path: string): { schemaVersion: number } {
     if (integrity.integrity_check !== 'ok') throw invalid(`${path} failed its integrity check: ${integrity.integrity_check}`);
     const schemaVersion = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
     if (schemaVersion > MIGRATIONS.length) {
-      throw new MemoryError('schema', `${path} was written by a newer Enve Memory (schema ${schemaVersion}).`);
+      throw new MemoryError('schema', `${path} was written by a newer Petty Memory (schema ${schemaVersion}).`);
     }
-    if (!db.prepare(`SELECT 1 FROM sqlite_master WHERE name = 'items'`).get()) throw invalid(`${path} is not an Enve Memory library.`);
+    if (!db.prepare(`SELECT 1 FROM sqlite_master WHERE name = 'items'`).get()) throw invalid(`${path} is not a Petty Memory library.`);
     return { schemaVersion };
   } finally {
     db.close();

@@ -90,7 +90,7 @@ struct NotificationPrompt: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Get reminders on this phone").font(HearthFont.subheadline)
                     Text(reminders.canAsk ? "They'll arrive even when you're away from your network."
-                                          : "Notifications are off for Enve Memory in Settings.")
+                                          : "Notifications are off for Petty Memory in Settings.")
                         .font(HearthFont.caption)
                         .foregroundStyle(hearth.textSecondary)
                 }

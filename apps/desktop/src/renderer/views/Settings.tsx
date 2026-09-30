@@ -250,7 +250,7 @@ function DevicesSection() {
       )}
 
       <h3>Pair a phone</h3>
-      <p className="note">Creates a read + write token and a pairing link. Scan the code with the Enve Memory app on your phone.</p>
+      <p className="note">Creates a read + write token and a pairing link. Scan the code with the Petty Memory app on your phone.</p>
       <form
         className="token-form"
         onSubmit={(event) => {
@@ -658,7 +658,7 @@ const IMPORTS: { kind: ImportKind; title: string; detail: string; button: string
   { kind: 'bookmarks', title: 'Browser bookmarks', detail: 'The HTML file Chrome, Safari, Firefox or Edge exports. Folders become tags; pages aren’t fetched, so importing hundreds stays quick.', button: 'Choose file…', project: true },
   { kind: 'markdown', title: 'Markdown folder', detail: 'An Obsidian vault or any folder of .md files. Front matter titles, tags and dates are kept.', button: 'Choose folder…', project: true },
   { kind: 'csv', title: 'CSV', detail: 'A spreadsheet with columns like title, url, note, tags. Rows with a URL become links, the rest notes.', button: 'Choose file…', project: true },
-  { kind: 'enve', title: 'Enve Memory export', detail: 'A folder written by Export everything, from this or another computer. Projects, decisions and files come back too.', button: 'Choose folder…', project: false },
+  { kind: 'enve', title: 'Petty Memory export', detail: 'A folder written by Export everything, from this or another computer. Projects, decisions and files come back too.', button: 'Choose folder…', project: false },
 ];
 
 function ImportSection() {
@@ -756,7 +756,7 @@ function SyncSection() {
                 <>
                   <p className="note">
                     Every computer needs the same passphrase. It can’t be recovered: if you lose it, start over with a new, empty folder.
-                    Enve Memory keeps only a key derived from it, never the passphrase. If this folder is already encrypted, enter its passphrase.
+                    Petty Memory keeps only a key derived from it, never the passphrase. If this folder is already encrypted, enter its passphrase.
                   </p>
                   <div className="field-row">
                     <label className="field">
@@ -813,7 +813,7 @@ function SyncSection() {
           )}
           <p className="note">
             If two computers edit the same note or project memory between syncs, both versions are kept: the other one becomes a
-            “Conflicting edit of …” note. The CLI can do the same with <code>enve-memory sync [folder]</code> and <code>enve-memory sync off</code>.
+            “Conflicting edit of …” note. The CLI can do the same with <code>petty-memory sync [folder]</code> and <code>petty-memory sync off</code>.
           </p>
           <button className="button small" disabled={busy} onClick={() => void stop()}>Stop syncing</button>
         </>
@@ -846,7 +846,7 @@ function BackupsSection() {
       body: (
         <>
           <p>Your library goes back to how it was on <strong>{formatDateTime(createdAt)}</strong>. Anything saved since then disappears from it.</p>
-          <p>The current library is snapshotted first, so you can undo this by restoring that snapshot. Quit AI clients that use Enve Memory (Claude Code, Codex…) before continuing.</p>
+          <p>The current library is snapshotted first, so you can undo this by restoring that snapshot. Quit AI clients that use Petty Memory (Claude Code, Codex…) before continuing.</p>
         </>
       ),
       confirmLabel: 'Restore snapshot',
@@ -895,7 +895,7 @@ function ExportSection() {
   return (
     <Section
       title="Export everything"
-      intro="Writes your whole library as plain Markdown and the original files, plus a complete metadata.json. Useful with or without Enve Memory."
+      intro="Writes your whole library as plain Markdown and the original files, plus a complete metadata.json. Useful with or without Petty Memory."
     >
       <button className="button" onClick={() => call('exports.run').then((result) => result && setSummary(result), fail)}>
         <Icon name="external" size={15} /> Choose a folder and export…
@@ -941,7 +941,7 @@ function AboutSection() {
   const { info } = useApp();
   return (
     <Section title="About">
-      <p>Enve Memory {info?.version} — shared memory for you and your AI tools.</p>
+      <p>Petty Memory {info?.version} — shared memory for you and your AI tools.</p>
       <p className="muted">Free software under the GNU Affero General Public License v3.0 (AGPL-3.0-only). Your data stays on this computer unless you choose otherwise.</p>
     </Section>
   );

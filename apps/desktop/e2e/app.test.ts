@@ -87,7 +87,7 @@ async function settings(section: string): Promise<void> {
 const call = (method: string, ...args: unknown[]) =>
   page.evaluate(async ([m, a]) => window.enve.call(m as string, ...(a as unknown[])), [method, args] as const);
 
-describe('Enve Memory desktop', { timeout: 180_000 }, () => {
+describe('Petty Memory desktop', { timeout: 180_000 }, () => {
   before(async () => {
     mkdirSync(shots, { recursive: true });
     runCli('settings', 'semanticSearch', 'false');
@@ -260,8 +260,8 @@ describe('Enve Memory desktop', { timeout: 180_000 }, () => {
 
   test('connect screens show MCP setup and a pairing QR code', async () => {
     await settings('AI tools');
-    await page.getByText('claude mcp add --scope user enve-memory -e ELECTRON_RUN_AS_NODE=1', { exact: false }).waitFor();
-    await page.getByText('[mcp_servers.enve-memory]', { exact: false }).waitFor();
+    await page.getByText('claude mcp add --scope user petty-memory -e ELECTRON_RUN_AS_NODE=1', { exact: false }).waitFor();
+    await page.getByText('[mcp_servers.petty-memory]', { exact: false }).waitFor();
     await shot('settings-ai-tools-dark');
 
     await settings('Devices & extensions');

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="color-scheme" content="dark light">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Enve Memory Settings</title>
+  <title>Petty Memory Settings</title>
   <link rel="stylesheet" href="base.css">
   <link rel="stylesheet" href="options.css">
   <script type="module" src="options.js"></script>
@@ -12,7 +12,7 @@
 <body>
   <main>
     <header class="page-header">
-      <span class="brand"><img src="icons/icon-48.png" alt="" width="28" height="28">Enve Memory</span>
+      <span class="brand"><img src="icons/icon-48.png" alt="" width="28" height="28">Petty Memory</span>
       <p class="subtitle">Save pages, links and selections from your browser to your own library.</p>
     </header>
 
@@ -23,7 +23,7 @@
         <span class="label">Server</span>
         <input id="server-url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:49231">
       </label>
-      <p class="help">Where Enve Memory is running. The default works when the app or <code>enve-memory serve</code> runs on this computer.</p>
+      <p class="help">Where Petty Memory is running. The default works when the app or <code>petty-memory serve</code> runs on this computer.</p>
 
       <div class="field">
         <label class="label" for="token">Access token</label>
@@ -33,7 +33,7 @@
         </div>
       </div>
       <p class="help">Create one in a terminal. It's shown once, and stays in this browser profile only.</p>
-      <code class="command">enve-memory clients add "Browser" --scope read,capture</code>
+      <code class="command">petty-memory clients add "Browser" --scope read,capture</code>
 
       <div id="result" class="message" role="status" hidden>
         <p id="result-title" class="result-title"></p>
@@ -59,7 +59,7 @@
 
     <section class="panel">
       <h2>Import browser bookmarks</h2>
-      <p class="help">Adds every bookmark in this browser to Enve Memory in one go. Folder names become tags. Pages you've already saved get the new tags and aren't duplicated, so running it again is safe. Whether pages are fetched for full-text search follows Enve Memory's own settings.</p>
+      <p class="help">Adds every bookmark in this browser to Petty Memory in one go. Folder names become tags. Pages you've already saved get the new tags and aren't duplicated, so running it again is safe. Whether pages are fetched for full-text search follows Petty Memory's own settings.</p>
       <div id="import-progress" class="progress" hidden>
         <div class="progress-track"><div id="import-bar" class="progress-bar"></div></div>
         <p id="import-count" class="help"></p>
@@ -78,7 +78,7 @@
       <label class="toggle">
         <input type="checkbox" id="track-visits">
         <span><strong>Mark saved links as opened when I visit them</strong>
-          <span class="help">When you switch to a tab, its address is checked against your library with Enve Memory's lookup, and a saved link is marked opened (so it leaves the Unopened shelf). Addresses go only to your own Enve Memory; nothing else is recorded or sent. Needs permission to see your tabs. Off by default.</span></span>
+          <span class="help">When you switch to a tab, its address is checked against your library with Petty Memory's lookup, and a saved link is marked opened (so it leaves the Unopened shelf). Addresses go only to your own Petty Memory; nothing else is recorded or sent. Needs permission to see your tabs. Off by default.</span></span>
       </label>
       <label class="toggle">
         <input type="checkbox" id="notify-reminders">

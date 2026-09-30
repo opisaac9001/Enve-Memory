@@ -7,9 +7,9 @@ import { REMINDER_PREFIX, checkReminders, openReminder } from './lib/reminders.j
 import { connect, loadSettings } from './lib/settings.js';
 
 const MENUS = [
-  { id: 'page', title: 'Save page to Enve Memory', contexts: ['page', 'frame'] },
-  { id: 'selection', title: 'Save selection to Enve Memory', contexts: ['selection'] },
-  { id: 'link', title: 'Save link to Enve Memory', contexts: ['link'] },
+  { id: 'page', title: 'Save page to Petty Memory', contexts: ['page', 'frame'] },
+  { id: 'selection', title: 'Save selection to Petty Memory', contexts: ['selection'] },
+  { id: 'link', title: 'Save link to Petty Memory', contexts: ['link'] },
 ];
 const OUTBOX_ALARM = 'outbox';
 const REMINDER_ALARM = 'reminders';
@@ -83,7 +83,7 @@ ext.notifications.onClicked.addListener((id) => {
   if (id.startsWith(REMINDER_PREFIX)) return openReminder(id);
 });
 
-// Opt-in: marks a saved link opened when its tab comes up. The URL goes only to Enve Memory's /lookup.
+// Opt-in: marks a saved link opened when its tab comes up. The URL goes only to Petty Memory's /lookup.
 const reportedVisits = new Set();
 async function reportVisit(tabId, url) {
   if (!isCapturableUrl(url) || reportedVisits.has(`${tabId} ${url}`)) return;

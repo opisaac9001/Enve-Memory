@@ -1,6 +1,6 @@
 import { ext } from './browser.js';
 
-/** Opens a saved link in a new tab and tells Enve Memory it was opened (drives the Unopened shelf). */
+/** Opens a saved link in a new tab and tells Petty Memory it was opened (drives the Unopened shelf). */
 export async function openItem(client, item, { active = true } = {}) {
   if (!item.url) return;
   await ext.tabs.create({ url: item.url, active });

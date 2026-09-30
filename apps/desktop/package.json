@@ -1,13 +1,13 @@
 {
   "name": "@enve-memory/desktop",
-  "productName": "Enve Memory",
+  "productName": "Petty Memory",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "description": "Enve Memory desktop app",
+  "description": "Petty Memory desktop app",
   "author": "Enve Media",
-  "homepage": "https://envemedia.com",
+  "homepage": "https://github.com/petty-foss-dev/Petty-Memory",
   "main": "dist/main.js",
   "scripts": {
     "dev": "node scripts/dev.mjs",

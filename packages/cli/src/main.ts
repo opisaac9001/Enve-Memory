@@ -15,9 +15,9 @@ import { SERVER_NAME, serveMemoryOverStdio } from '@enve-memory/mcp';
 import pkg from '../package.json' with { type: 'json' };
 import * as format from './format.ts';
 
-const USAGE = `enve-memory ${pkg.version} — local memory for you and your AI tools
+const USAGE = `petty-memory ${pkg.version} — local memory for you and your AI tools
 
-Usage: enve-memory <command> [options]
+Usage: petty-memory <command> [options]
 
 Capture
   note <text…>                 Save a note           [--title] [-p project] [-t tag]…
@@ -80,7 +80,7 @@ Bring things in
   import bookmarks <file.html> Browser bookmark export; folders become tags  [-p project] [--archive fetches every page]
   import markdown <folder>     A folder of Markdown notes or an Obsidian vault  [-p project]
   import csv <file.csv>        Bookmark CSV (Raindrop, Pinboard, spreadsheets)  [-p project]
-  import enve <export-folder>  Restore an Enve Memory export, keeping ids and dates
+  import enve <export-folder>  Restore a Petty Memory export, keeping ids and dates
 
 Automations
   rules                        List rules
@@ -164,7 +164,7 @@ function parseCommandLine<T extends ParseArgsConfig>(config: T): ReturnType<type
   try {
     return parseArgs(config);
   } catch (error) {
-    console.error(`${(error as Error).message}\nRun \`enve-memory --help\` for usage.`);
+    console.error(`${(error as Error).message}\nRun \`petty-memory --help\` for usage.`);
     process.exit(2);
   }
 }
@@ -224,7 +224,7 @@ async function run(memory: EnveMemory): Promise<void> {
       let target = item.url;
       if (item.attachments.length > 0) {
         const { attachment, path } = memory.files.primary(item.id);
-        const dir = join(tmpdir(), 'enve-memory', item.id);
+        const dir = join(tmpdir(), 'petty-memory', item.id);
         mkdirSync(dir, { recursive: true });
         target = join(dir, attachment.filename);
         copyFileSync(path, target);
@@ -236,7 +236,7 @@ async function run(memory: EnveMemory): Promise<void> {
     }
     case 'index': {
       const embedder = attachLocalEmbedder(memory);
-      if (!embedder) throw new UsageError('Semantic search is off. Turn it on with `enve-memory settings semanticSearch true`.');
+      if (!embedder) throw new UsageError('Semantic search is off. Turn it on with `petty-memory settings semanticSearch true`.');
       let total = 0;
       const { pending } = memory.embeddings.status(embedder.model);
       if (pending && !opts.json) process.stderr.write(`Indexing ${pending} item${pending === 1 ? '' : 's'} with ${embedder.model}…\n`);
@@ -426,7 +426,7 @@ async function run(memory: EnveMemory): Promise<void> {
 
 function requireProvider(memory: EnveMemory): AiProvider {
   const provider = providerFor(memory);
-  if (!provider) throw new UsageError('No AI provider is set up. Choose one with `enve-memory ai use <provider>`.');
+  if (!provider) throw new UsageError('No AI provider is set up. Choose one with `petty-memory ai use <provider>`.');
   return provider;
 }
 
@@ -474,7 +474,7 @@ async function runAi(memory: EnveMemory): Promise<void> {
     autoApply: settings.aiAutoApply,
   };
   return emit(status, settings.aiProvider === 'none'
-    ? 'AI is off. Everything else works without it. Turn it on with `enve-memory ai use <provider>`.'
+    ? 'AI is off. Everything else works without it. Turn it on with `petty-memory ai use <provider>`.'
     : `Provider  ${settings.aiProvider}${settings.aiBaseUrl ? ` at ${settings.aiBaseUrl}` : ''}\nModel     ${settings.aiModel}\nEnrich    ${settings.aiEnrich ? `on (items saved since ${settings.aiEnrichSince})` : 'off'}\nApply     ${settings.aiAutoApply ? 'automatically' : 'when you accept'}`);
 }
 
@@ -484,7 +484,7 @@ function runRules(memory: EnveMemory): void {
     case undefined:
     case 'list': {
       const rules = memory.rules.list();
-      return emit(rules, rules.map(format.ruleLine).join('\n') || 'No rules yet. Add one with `enve-memory rules add`.');
+      return emit(rules, rules.map(format.ruleLine).join('\n') || 'No rules yet. Add one with `petty-memory rules add`.');
     }
     case 'add': {
       const rule = memory.rules.create({
@@ -526,7 +526,7 @@ function runClients(memory: EnveMemory): void {
       const links = lanUrls(port).map((url) => pairingLink(url, token, client.name));
       return emit(
         { client, token, links },
-        `Paired ${client.name}. Start the server with \`enve-memory serve --lan\`, then open one of these on the device:\n\n${links.map((l) => `  ${l}`).join('\n') || '  (no network address found; connect to Wi-Fi or Tailscale)'}\n\nThe link contains the token and is shown once.`,
+        `Paired ${client.name}. Start the server with \`petty-memory serve --lan\`, then open one of these on the device:\n\n${links.map((l) => `  ${l}`).join('\n') || '  (no network address found; connect to Wi-Fi or Tailscale)'}\n\nThe link contains the token and is shown once.`,
       );
     }
     case 'list': {
@@ -586,7 +586,7 @@ async function serve(): Promise<void> {
   };
   sync();
   const syncTimer = setInterval(sync, 2 * 60_000);
-  console.error(`Enve Memory API listening on ${url}${opts.lan ? ' (also reachable from your network)' : ''}\nREST: ${url}/api/v1   MCP: ${url}/mcp`);
+  console.error(`Petty Memory API listening on ${url}${opts.lan ? ' (also reachable from your network)' : ''}\nREST: ${url}/api/v1   MCP: ${url}/mcp`);
   const stop = async () => {
     clearInterval(backupTimer);
     clearInterval(syncTimer);
@@ -685,8 +685,8 @@ Claude Desktop, Cursor and other JSON-configured clients:
   ${JSON.stringify({ mcpServers: { [SERVER_NAME]: { command: node, args, ...(env ? { env } : {}) } } })}
 
 Clients that connect over HTTP (remote agents, other machines):
-  1. enve-memory serve            (the desktop app runs this for you)
-  2. enve-memory clients add "My agent" --scope read,write
+  1. petty-memory serve            (the desktop app runs this for you)
+  2. petty-memory clients add "My agent" --scope read,write
   3. Point the client at http://127.0.0.1:${DEFAULT_PORT}/mcp with header  Authorization: Bearer <token>`;
 }
 
@@ -741,13 +741,13 @@ function openExternal(target: string): void {
 
 function fail(error: unknown): void {
   if (error instanceof UsageError) {
-    console.error(`${error.message}\nRun \`enve-memory --help\` for usage.`);
+    console.error(`${error.message}\nRun \`petty-memory --help\` for usage.`);
     process.exitCode = 2;
   } else if (error instanceof MemoryError || error instanceof AiError) {
     console.error(`error: ${error.message}`);
     process.exitCode = 1;
   } else if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') {
-    console.error('error: that port is already in use. Is Enve Memory already running? Use --port to pick another.');
+    console.error('error: that port is already in use. Is Petty Memory already running? Use --port to pick another.');
     process.exitCode = 1;
   } else {
     throw error;
