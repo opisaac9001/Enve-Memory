@@ -7,12 +7,12 @@
   "exports": "./src/index.ts",
   "dependencies": {
     "@enve-memory/core": "0.1.0",
-    "@modelcontextprotocol/server": "^2.1.0",
+    "@modelcontextprotocol/server": "^2.2.0",
     "zod": "^4.6.5",
     "@enve-memory/ingestion": "0.1.0",
     "@enve-memory/embeddings": "0.1.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "^2.1.0"
+    "@modelcontextprotocol/client": "^2.2.0"
   }
 }
